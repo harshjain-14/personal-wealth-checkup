@@ -2,13 +2,23 @@ import { BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, Legend, Toolti
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { 
-  AlertTriangle, 
   TrendingUp, 
+  TrendingDown,
+  AlertTriangle, 
   Lightbulb,
-  RefreshCw
+  RefreshCw,
+  ChartBar,
+  ChartPie,
+  Shield,
+  IndianRupee
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { AnalysisReport, SectorBreakdown, AssetAllocation, PortfolioInsight } from '@/services/analysis-service';
+import { 
+  AnalysisReport, 
+  PortfolioInsight, 
+  SectorBreakdown, 
+  AssetAllocation 
+} from '@/services/analysis-service';
 
 interface PortfolioAnalysisResultProps {
   report: AnalysisReport;
@@ -26,9 +36,31 @@ const InsightIcon = ({ type }: { type: PortfolioInsight['type'] }) => {
       return <AlertTriangle className="h-5 w-5 text-finance-red" />;
     case 'suggestion':
       return <Lightbulb className="h-5 w-5 text-amber-500" />;
+    case 'tax':
+      return <IndianRupee className="h-5 w-5 text-emerald-500" />;
+    case 'goal':
+      return <ChartBar className="h-5 w-5 text-blue-500" />;
+    case 'volatility':
+      return <ChartPie className="h-5 w-5 text-purple-500" />;
     default:
-      return null;
+      return <Shield className="h-5 w-5 text-gray-500" />;
   }
+};
+
+const InsightPriorityBadge = ({ priority }: { priority?: PortfolioInsight['priority'] }) => {
+  if (!priority) return null;
+  
+  const colors = {
+    high: 'bg-red-100 text-red-800',
+    medium: 'bg-yellow-100 text-yellow-800',
+    low: 'bg-green-100 text-green-800'
+  };
+
+  return (
+    <span className={`text-xs px-2 py-1 rounded-full ${colors[priority]}`}>
+      {priority.charAt(0).toUpperCase() + priority.slice(1)} Priority
+    </span>
+  );
 };
 
 const PortfolioAnalysisResult = ({ report, onRefresh, isLoading }: PortfolioAnalysisResultProps) => {
@@ -71,7 +103,6 @@ const PortfolioAnalysisResult = ({ report, onRefresh, isLoading }: PortfolioAnal
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Performance Metrics Card */}
         <Card className="bg-white shadow-sm border-finance-teal/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-medium">Performance Metrics</CardTitle>
@@ -115,7 +146,6 @@ const PortfolioAnalysisResult = ({ report, onRefresh, isLoading }: PortfolioAnal
           </CardContent>
         </Card>
 
-        {/* Sector Breakdown Chart */}
         <Card className="bg-white shadow-sm border-finance-teal/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-medium">Sector Breakdown</CardTitle>
@@ -146,7 +176,6 @@ const PortfolioAnalysisResult = ({ report, onRefresh, isLoading }: PortfolioAnal
           </CardContent>
         </Card>
 
-        {/* Asset Allocation Chart */}
         <Card className="bg-white shadow-sm border-finance-teal/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-medium">Asset Allocation</CardTitle>
@@ -178,32 +207,38 @@ const PortfolioAnalysisResult = ({ report, onRefresh, isLoading }: PortfolioAnal
         </Card>
       </div>
 
-      {/* Enhanced Portfolio Insights */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Insights */}
         <Card className="bg-white shadow-sm border-finance-teal/20">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-medium">Portfolio Insights</CardTitle>
+            <CardTitle className="text-lg font-medium">Smart Portfolio Insights</CardTitle>
             <CardDescription>
-              Key observations and recommendations for your portfolio
+              Personalized observations and actionable recommendations
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="space-y-6">
               {report.insights.map((insight, index) => (
-                <div key={index} className="flex space-x-3">
-                  <div className="mt-0.5">
+                <div key={index} className="flex space-x-4 p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                  <div className="mt-1">
                     <InsightIcon type={insight.type} />
                   </div>
-                  <div>
-                    <h4 className={`font-medium ${
-                      insight.type === 'strength' ? 'text-finance-green' :
-                      insight.type === 'warning' ? 'text-finance-red' :
-                      'text-amber-500'
-                    }`}>
-                      {insight.title}
-                    </h4>
-                    <p className="text-sm text-gray-600">{insight.description}</p>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold text-gray-900">{insight.title}</h4>
+                      {insight.priority && <InsightPriorityBadge priority={insight.priority} />}
+                    </div>
+                    <p className="text-gray-600">{insight.description}</p>
+                    {insight.actionable && (
+                      <div className="mt-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="text-finance-teal hover:bg-finance-teal/10"
+                        >
+                          See Details
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -211,33 +246,66 @@ const PortfolioAnalysisResult = ({ report, onRefresh, isLoading }: PortfolioAnal
           </CardContent>
         </Card>
 
-        {/* Liquidity and Rebalancing */}
         <div className="space-y-6">
           <Card className="bg-white shadow-sm border-finance-teal/20">
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg font-medium">Liquidity Analysis</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg font-medium">Risk Analysis</CardTitle>
+                <TrendingDown className={`h-5 w-5 ${
+                  report.riskMetrics.volatility.portfolioBeta > 1 
+                    ? 'text-finance-red' 
+                    : 'text-finance-green'
+                }`} />
+              </div>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-gray-600">{report.liquidityAnalysis}</p>
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-sm font-medium text-gray-500 mb-1">Portfolio Beta</h4>
+                  <div className="text-xl font-semibold">
+                    {report.riskMetrics.volatility.portfolioBeta.toFixed(2)}
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {report.riskMetrics.volatility.marketComparison}
+                  </p>
+                </div>
+                
+                <div>
+                  <h4 className="text-sm font-medium text-gray-500 mb-1">Quality Score</h4>
+                  <div className="text-xl font-semibold">
+                    {report.riskMetrics.qualityScore.overall.toFixed(1)}/100
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
-          
+
           <Card className="bg-white shadow-sm border-finance-teal/20">
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg font-medium">Rebalancing Recommendations</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg font-medium">Tax Insights</CardTitle>
+                <IndianRupee className="h-5 w-5 text-emerald-500" />
+              </div>
             </CardHeader>
             <CardContent>
-              <ul className="list-disc pl-5 space-y-2">
-                {report.rebalancingRecommendations?.map((recommendation, index) => (
-                  <li key={index} className="text-sm text-gray-600">{recommendation}</li>
-                ))}
-              </ul>
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-sm font-medium text-gray-500 mb-1">Potential Tax Savings</h4>
+                  <div className="text-xl font-semibold text-emerald-600">
+                    ₹{Math.floor(report.taxInsights.potentialSavings/1000)}K
+                  </div>
+                </div>
+                <ul className="list-disc pl-5 space-y-2">
+                  {report.taxInsights.suggestions.map((suggestion, index) => (
+                    <li key={index} className="text-sm text-gray-600">{suggestion}</li>
+                  ))}
+                </ul>
+              </div>
             </CardContent>
           </Card>
         </div>
       </div>
 
-      {/* Disclaimer */}
       <div className="bg-amber-50 border border-amber-200 p-4 rounded-md">
         <p className="text-sm text-amber-800 font-medium mb-1">Disclaimer:</p>
         <p className="text-xs text-amber-700">
