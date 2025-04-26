@@ -1,4 +1,3 @@
-
 import { BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -160,7 +159,7 @@ const PortfolioAnalysisResult = ({ report, onRefresh, isLoading }: PortfolioAnal
                   margin={{ top: 20, right: 30, left: 0, bottom: 5 }}
                 >
                   <Tooltip formatter={(value) => [`${formatPercentage(value as number)}`, 'Allocation']} />
-                  <Bar dataKey="percentage" nameKey="type">
+                  <Bar dataKey="percentage">
                     {report.assetAllocation.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
@@ -179,6 +178,7 @@ const PortfolioAnalysisResult = ({ report, onRefresh, isLoading }: PortfolioAnal
         </Card>
       </div>
 
+      {/* Enhanced Portfolio Insights */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Insights */}
         <Card className="bg-white shadow-sm border-finance-teal/20">
