@@ -8,6 +8,7 @@ import ExpensesForm from './ExpensesForm';
 import FutureExpensesForm from './FutureExpensesForm';
 import UserInfoForm from './UserInfoForm';
 import { Button } from '@/components/ui/button';
+import SeedDataButton from './SeedDataButton';
 import PortfolioService, { PortfolioData, ExternalInvestment, Expense, FutureExpense, UserInfo } from '@/services/portfolio-service';
 import AnalysisService from '@/services/analysis-service';
 import { toast } from 'sonner';
@@ -44,9 +45,8 @@ const DataEntryTabs = ({ portfolioData, onDataSaved, onAnalysisRequest }: DataEn
 
   const handleSaveExternalInvestments = async (investments: ExternalInvestment[]) => {
     try {
-      const updatedData = await PortfolioService.savePortfolioData({
-        externalInvestments: investments
-      });
+      await PortfolioService.saveExternalInvestments(investments);
+      const updatedData = await PortfolioService.getPortfolioData();
       onDataSaved(updatedData);
     } catch (error) {
       console.error('Error saving external investments:', error);
@@ -56,9 +56,8 @@ const DataEntryTabs = ({ portfolioData, onDataSaved, onAnalysisRequest }: DataEn
 
   const handleSaveExpenses = async (expenses: Expense[]) => {
     try {
-      const updatedData = await PortfolioService.savePortfolioData({
-        expenses: expenses
-      });
+      await PortfolioService.saveExpenses(expenses);
+      const updatedData = await PortfolioService.getPortfolioData();
       onDataSaved(updatedData);
     } catch (error) {
       console.error('Error saving expenses:', error);
@@ -68,9 +67,8 @@ const DataEntryTabs = ({ portfolioData, onDataSaved, onAnalysisRequest }: DataEn
 
   const handleSaveFutureExpenses = async (futureExpenses: FutureExpense[]) => {
     try {
-      const updatedData = await PortfolioService.savePortfolioData({
-        futureExpenses: futureExpenses
-      });
+      await PortfolioService.saveFutureExpenses(futureExpenses);
+      const updatedData = await PortfolioService.getPortfolioData();
       onDataSaved(updatedData);
     } catch (error) {
       console.error('Error saving future expenses:', error);
@@ -80,9 +78,8 @@ const DataEntryTabs = ({ portfolioData, onDataSaved, onAnalysisRequest }: DataEn
 
   const handleSaveUserInfo = async (userInfo: UserInfo) => {
     try {
-      const updatedData = await PortfolioService.savePortfolioData({
-        userInfo: userInfo
-      });
+      await PortfolioService.saveUserInfo(userInfo);
+      const updatedData = await PortfolioService.getPortfolioData();
       onDataSaved(updatedData);
     } catch (error) {
       console.error('Error saving user info:', error);
@@ -104,31 +101,43 @@ const DataEntryTabs = ({ portfolioData, onDataSaved, onAnalysisRequest }: DataEn
     }
   };
 
+  const handleDataSeeded = async () => {
+    // Refresh all data
+    const updatedData = await PortfolioService.getPortfolioData();
+    onDataSaved(updatedData);
+    // Update Zerodha connection status
+    setZerodhaConnected(updatedData.stocks.length > 0 || updatedData.mutualFunds.length > 0);
+  };
+
   return (
     <Card className="w-full bg-white shadow-sm">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid grid-cols-5 w-full">
-          <TabsTrigger value="zerodha">
-            Zerodha Data
-            {zerodhaConnected && <span className="ml-2 w-2 h-2 bg-finance-green rounded-full"></span>}
-          </TabsTrigger>
-          <TabsTrigger value="external">
-            External Investments
-            {portfolioData.externalInvestments.length > 0 && <span className="ml-2 w-2 h-2 bg-finance-green rounded-full"></span>}
-          </TabsTrigger>
-          <TabsTrigger value="expenses">
-            Expenses
-            {portfolioData.expenses.length > 0 && <span className="ml-2 w-2 h-2 bg-finance-green rounded-full"></span>}
-          </TabsTrigger>
-          <TabsTrigger value="future">
-            Future Expenses
-            {portfolioData.futureExpenses.length > 0 && <span className="ml-2 w-2 h-2 bg-finance-green rounded-full"></span>}
-          </TabsTrigger>
-          <TabsTrigger value="personal">
-            Personal Info
-            {portfolioData.userInfo?.age && <span className="ml-2 w-2 h-2 bg-finance-green rounded-full"></span>}
-          </TabsTrigger>
-        </TabsList>
+        <div className="flex justify-between items-center px-6 pt-4">
+          <TabsList className="grid grid-cols-5">
+            <TabsTrigger value="zerodha">
+              Zerodha Data
+              {zerodhaConnected && <span className="ml-2 w-2 h-2 bg-finance-green rounded-full"></span>}
+            </TabsTrigger>
+            <TabsTrigger value="external">
+              External Investments
+              {portfolioData.externalInvestments.length > 0 && <span className="ml-2 w-2 h-2 bg-finance-green rounded-full"></span>}
+            </TabsTrigger>
+            <TabsTrigger value="expenses">
+              Expenses
+              {portfolioData.expenses.length > 0 && <span className="ml-2 w-2 h-2 bg-finance-green rounded-full"></span>}
+            </TabsTrigger>
+            <TabsTrigger value="future">
+              Future Expenses
+              {portfolioData.futureExpenses.length > 0 && <span className="ml-2 w-2 h-2 bg-finance-green rounded-full"></span>}
+            </TabsTrigger>
+            <TabsTrigger value="personal">
+              Personal Info
+              {portfolioData.userInfo?.age && <span className="ml-2 w-2 h-2 bg-finance-green rounded-full"></span>}
+            </TabsTrigger>
+          </TabsList>
+          
+          <SeedDataButton onDataSeeded={handleDataSeeded} />
+        </div>
         
         <div className="p-6">
           <TabsContent value="zerodha" className="mt-0">

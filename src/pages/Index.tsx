@@ -1,17 +1,18 @@
 
 import { useState, useEffect } from 'react';
 import { useToast } from "@/components/ui/use-toast";
-import LoginForm from '@/components/LoginForm';
 import Header from '@/components/Header';
 import DataEntryTabs from '@/components/DataEntryTabs';
 import PortfolioAnalysisResult from '@/components/PortfolioAnalysisResult';
-import AuthService from '@/services/auth-service';
+import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import PortfolioService, { PortfolioData } from '@/services/portfolio-service';
 import AnalysisService, { AnalysisReport } from '@/services/analysis-service';
 
 const Index = () => {
   const { toast } = useToast();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { isAuthenticated, signOut } = useAuth();
+  const navigate = useNavigate();
   const [portfolioData, setPortfolioData] = useState<PortfolioData>({
     stocks: [],
     mutualFunds: [],
@@ -24,33 +25,33 @@ const Index = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [dataView, setDataView] = useState<'input' | 'results'>('input');
 
-  // Check authentication status
+  // Load portfolio data when authenticated
   useEffect(() => {
-    const isAuth = AuthService.isAuthenticated();
-    setIsAuthenticated(isAuth);
-    
-    if (isAuth) {
+    if (isAuthenticated) {
       loadPortfolioData();
     }
-  }, []);
+  }, [isAuthenticated]);
   
   // Load portfolio data
-  const loadPortfolioData = () => {
-    const data = PortfolioService.getPortfolioData();
-    setPortfolioData(data);
-  };
-  
-  // Handle login success
-  const handleLoginSuccess = () => {
-    setIsAuthenticated(true);
-    loadPortfolioData();
+  const loadPortfolioData = async () => {
+    try {
+      const data = await PortfolioService.getPortfolioData();
+      setPortfolioData(data);
+    } catch (error) {
+      console.error("Error loading portfolio data:", error);
+      toast({
+        title: "Data Loading Failed",
+        description: "Could not load your portfolio data. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
   
   // Handle logout
   const handleLogout = () => {
-    AuthService.logout();
-    setIsAuthenticated(false);
+    signOut();
     setAnalysisReport(null);
+    navigate('/auth');
   };
   
   // Handle data refresh
@@ -58,7 +59,7 @@ const Index = () => {
     if (analysisReport) {
       await generateAnalysis();
     } else {
-      loadPortfolioData();
+      await loadPortfolioData();
     }
   };
   
@@ -94,49 +95,41 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {isAuthenticated ? (
-        <>
-          <Header onLogout={handleLogout} onRefresh={handleRefresh} />
-          
-          <main className="container mx-auto py-6 px-4">
-            {dataView === 'input' ? (
-              <>
-                <h1 className="text-2xl font-bold text-finance-blue mb-6">Personal Portfolio Analyzer</h1>
-                <DataEntryTabs 
-                  portfolioData={portfolioData} 
-                  onDataSaved={handleDataSaved} 
-                  onAnalysisRequest={generateAnalysis}
+      <Header onLogout={handleLogout} onRefresh={handleRefresh} />
+      
+      <main className="container mx-auto py-6 px-4">
+        {dataView === 'input' ? (
+          <>
+            <h1 className="text-2xl font-bold text-finance-blue mb-6">Personal Portfolio Analyzer</h1>
+            <DataEntryTabs 
+              portfolioData={portfolioData} 
+              onDataSaved={handleDataSaved} 
+              onAnalysisRequest={generateAnalysis}
+            />
+          </>
+        ) : (
+          <>
+            {analysisReport && (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h1 className="text-2xl font-bold text-finance-blue">Portfolio Analysis Results</h1>
+                  <button 
+                    onClick={handleReturnToInput} 
+                    className="text-finance-teal hover:text-finance-blue underline text-sm"
+                  >
+                    Return to Data Entry
+                  </button>
+                </div>
+                <PortfolioAnalysisResult 
+                  report={analysisReport} 
+                  onRefresh={generateAnalysis}
+                  isLoading={isAnalyzing}
                 />
-              </>
-            ) : (
-              <>
-                {analysisReport && (
-                  <div className="space-y-6">
-                    <div className="flex justify-between items-center">
-                      <h1 className="text-2xl font-bold text-finance-blue">Portfolio Analysis Results</h1>
-                      <button 
-                        onClick={handleReturnToInput} 
-                        className="text-finance-teal hover:text-finance-blue underline text-sm"
-                      >
-                        Return to Data Entry
-                      </button>
-                    </div>
-                    <PortfolioAnalysisResult 
-                      report={analysisReport} 
-                      onRefresh={generateAnalysis}
-                      isLoading={isAnalyzing}
-                    />
-                  </div>
-                )}
-              </>
+              </div>
             )}
-          </main>
-        </>
-      ) : (
-        <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
-          <LoginForm onLoginSuccess={handleLoginSuccess} />
-        </div>
-      )}
+          </>
+        )}
+      </main>
     </div>
   );
 };

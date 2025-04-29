@@ -1,5 +1,6 @@
-
-// Auth service to handle login/logout functionality
+// This file is now deprecated as we're using Supabase auth
+// Keeping the file for now to prevent breaking changes while transitioning
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from "sonner";
 
 // Types
@@ -9,44 +10,56 @@ export interface User {
   email: string;
 }
 
-// Simulated authentication service
+// Auth service that uses Supabase
 const AuthService = {
   currentUser: null as User | null,
   
   login: async (email: string, password: string): Promise<User> => {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    // In a real app, this would validate credentials against a backend
-    if (!email || !password) {
-      throw new Error("Email and password are required");
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      
+      if (error) {
+        toast.error(error.message || "Invalid credentials. Please try again.");
+        throw new Error(error.message);
+      }
+      
+      if (!data.user) {
+        toast.error("User not found.");
+        throw new Error("User not found");
+      }
+      
+      // Create a User object from Supabase user
+      const user: User = {
+        id: data.user.id,
+        name: data.user.email?.split('@')[0] || 'User',
+        email: data.user.email || ''
+      };
+      
+      // Save to local storage to maintain compatibility
+      localStorage.setItem("portfolio_analyzer_user", JSON.stringify(user));
+      AuthService.currentUser = user;
+      
+      toast.success("Logged in successfully!");
+      return user;
+    } catch (error) {
+      console.error("Login error:", error);
+      throw error;
     }
-    
-    // Simple validation
-    if (!email.includes("@") || password.length < 6) {
-      toast.error("Invalid credentials. Please try again.");
-      throw new Error("Invalid credentials");
-    }
-    
-    // Mock successful login
-    const user: User = {
-      id: "usr_" + Math.random().toString(36).substr(2, 9),
-      name: email.split('@')[0],
-      email: email
-    };
-    
-    // Save to local storage to persist session
-    localStorage.setItem("portfolio_analyzer_user", JSON.stringify(user));
-    AuthService.currentUser = user;
-    
-    toast.success("Logged in successfully!");
-    return user;
   },
   
-  logout: () => {
-    localStorage.removeItem("portfolio_analyzer_user");
-    AuthService.currentUser = null;
-    toast.info("Logged out successfully");
+  logout: async () => {
+    try {
+      await supabase.auth.signOut();
+      localStorage.removeItem("portfolio_analyzer_user");
+      AuthService.currentUser = null;
+      toast.info("Logged out successfully");
+    } catch (error) {
+      console.error("Logout error:", error);
+      toast.error("Error logging out");
+    }
   },
   
   getCurrentUser: (): User | null => {
@@ -67,8 +80,13 @@ const AuthService = {
     return null;
   },
   
-  isAuthenticated: (): boolean => {
-    return AuthService.getCurrentUser() !== null;
+  isAuthenticated: async (): Promise<boolean> => {
+    try {
+      const { data } = await supabase.auth.getSession();
+      return !!data.session;
+    } catch (error) {
+      return false;
+    }
   }
 };
 

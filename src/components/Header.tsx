@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
 import { User, LogOut, RefreshCw } from 'lucide-react';
-import AuthService from '@/services/auth-service';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface HeaderProps {
   onLogout: () => void;
@@ -19,12 +19,17 @@ interface HeaderProps {
 
 const Header = ({ onLogout, onRefresh }: HeaderProps) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const user = AuthService.getCurrentUser();
+  const { user, signOut } = useAuth();
   
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await onRefresh();
     setIsRefreshing(false);
+  };
+  
+  const handleLogout = async () => {
+    await signOut();
+    onLogout();
   };
   
   return (
@@ -58,11 +63,11 @@ const Header = ({ onLogout, onRefresh }: HeaderProps) => {
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>
               <span className="font-normal text-sm text-gray-500">Signed in as</span>
-              <p className="font-medium">{user?.name || 'User'}</p>
+              <p className="font-medium">{user?.email?.split('@')[0] || 'User'}</p>
               <p className="text-xs text-gray-500 truncate">{user?.email}</p>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onLogout} className="text-finance-red cursor-pointer">
+            <DropdownMenuItem onClick={handleLogout} className="text-finance-red cursor-pointer">
               <LogOut className="h-4 w-4 mr-2" />
               <span>Logout</span>
             </DropdownMenuItem>
