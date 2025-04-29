@@ -1,4 +1,3 @@
-
 // Updated Portfolio service to use Supabase
 
 import { supabase } from "@/integrations/supabase/client";
@@ -67,31 +66,34 @@ export interface Expense {
   id?: number;
 }
 
-type PurposeType = Database["public"]["Enums"]["future_expense_enum"];
+type PurposeType = Database["public"]["Enums"]["future_expense_enumm"];
 type TimeframeType = Database["public"]["Enums"]["timeframe_enum"];
 type PriorityType = Database["public"]["Enums"]["priority_enum"];
 
 // Map frontend purpose to database enum
 const mapPurposeToEnum = (purpose: string): PurposeType => {
   switch (purpose.toLowerCase()) {
-    case 'vacation': return 'vacation';
-    case 'education': return 'education';
-    case 'house purchase': return 'home_purchase';
-    case 'car purchase': return 'other';
-    case 'retirement': return 'retirement';
-    default: return 'other';
+    case 'vacation': return 'Vacation';
+    case 'education': return 'Education';
+    case 'house purchase': return 'House Purchase'; // Fixed to match the exact enum value
+    case 'car purchase': return 'Car Purchase';
+    case 'medical treatment': return 'Medical Treatment';
+    case 'home renovation': return 'Home Renovation';
+    case 'business startup': return 'Business Startup';
+    case 'wedding': return 'Wedding';
+    default: return 'Other';
   }
 };
 
 // Map timeframe to database enum
 const mapTimeframeToEnum = (timeframe: string): TimeframeType => {
-  if (timeframe.includes('year') || parseInt(timeframe) > 5) {
-    return 'long_term';
-  } else if (timeframe.includes('month') || parseInt(timeframe) <= 1) {
-    return 'short_term';
-  } else {
-    return 'medium_term';
-  }
+  if (timeframe === '3 months') return '3 months';
+  if (timeframe === '6 months') return '6 months';
+  if (timeframe === '1 year') return '1 year';
+  if (timeframe === '2 years') return '2 years';
+  if (timeframe === '5 years') return '5 years';
+  if (timeframe === '10 years') return '10 years';
+  return 'Other';
 };
 
 export interface FutureExpense {
@@ -336,24 +338,23 @@ const PortfolioService = {
       // Then insert new expenses
       if (expenses.length > 0) {
         // Map expenses to the database schema with proper enum types
-        const formattedExpenses = expenses.map(expense => ({
-          user_id: user.id,
-          expense_type: mapExpenseTypeToEnum(expense.type),
-          description: expense.name,
-          amount: expense.amount,
-          frequency: mapFrequencyToEnum(expense.frequency),
-          notes: expense.notes || null
-        }));
-        
-        // Insert expenses one by one to avoid type errors with bulk insert
-        for (const expense of formattedExpenses) {
+        for (const expense of expenses) {
+          const formattedExpense = {
+            user_id: user.id,
+            expense_type: mapExpenseTypeToEnum(expense.type),
+            description: expense.name,
+            amount: expense.amount,
+            frequency: mapFrequencyToEnum(expense.frequency),
+            notes: expense.notes || null
+          };
+          
           const { error: insertError } = await supabase
             .from('regular_expenses')
-            .insert(expense);
+            .insert(formattedExpense);
           
           if (insertError) {
             console.error("Insert error:", insertError);
-            toast.error("Failed to save expense: " + expense.description);
+            toast.error("Failed to save expense: " + expense.name);
             return false;
           }
         }
@@ -425,21 +426,23 @@ const PortfolioService = {
       
       // Then insert new future expenses
       if (futureExpenses.length > 0) {
-        // Map to the database schema with proper enum types
-        const formattedExpenses = futureExpenses.map(expense => ({
-          user_id: user.id,
-          purpose: mapPurposeToEnum(expense.purpose),
-          amount: expense.amount,
-          timeframe: mapTimeframeToEnum(expense.timeframe),
-          priority: expense.priority as PriorityType, // Direct mapping as enums match
-          notes: expense.notes || null
-        }));
-        
-        // Insert expenses one by one to avoid type errors with bulk insert
-        for (const expense of formattedExpenses) {
+        // Process each expense individually for better error handling
+        for (const expense of futureExpenses) {
+          // Map to the database schema with proper enum types
+          const formattedExpense = {
+            user_id: user.id,
+            purpose: mapPurposeToEnum(expense.purpose),
+            amount: expense.amount,
+            timeframe: mapTimeframeToEnum(expense.timeframe),
+            priority: expense.priority.toLowerCase() as PriorityType, // Ensure lowercase for consistency
+            notes: expense.notes || null
+          };
+          
+          console.log("Saving future expense:", formattedExpense); // Add debug logging
+          
           const { error: insertError } = await supabase
             .from('future_expenses')
-            .insert(expense);
+            .insert(formattedExpense);
           
           if (insertError) {
             console.error("Insert error:", insertError);

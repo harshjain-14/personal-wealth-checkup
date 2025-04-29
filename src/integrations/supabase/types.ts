@@ -17,6 +17,7 @@ export type Database = {
           investment_name: string
           investment_type: Database["public"]["Enums"]["investment_type"]
           notes: string | null
+          user_email: string | null
           user_id: string | null
         }
         Insert: {
@@ -26,6 +27,7 @@ export type Database = {
           investment_name: string
           investment_type: Database["public"]["Enums"]["investment_type"]
           notes?: string | null
+          user_email?: string | null
           user_id?: string | null
         }
         Update: {
@@ -35,6 +37,7 @@ export type Database = {
           investment_name?: string
           investment_type?: Database["public"]["Enums"]["investment_type"]
           notes?: string | null
+          user_email?: string | null
           user_id?: string | null
         }
         Relationships: []
@@ -46,7 +49,7 @@ export type Database = {
           id: number
           notes: string | null
           priority: Database["public"]["Enums"]["priority_enum"]
-          purpose: Database["public"]["Enums"]["future_expense_enum"]
+          purpose: Database["public"]["Enums"]["future_expense_enumm"]
           timeframe: Database["public"]["Enums"]["timeframe_enum"]
           user_id: string
         }
@@ -56,7 +59,7 @@ export type Database = {
           id?: number
           notes?: string | null
           priority: Database["public"]["Enums"]["priority_enum"]
-          purpose: Database["public"]["Enums"]["future_expense_enum"]
+          purpose: Database["public"]["Enums"]["future_expense_enumm"]
           timeframe: Database["public"]["Enums"]["timeframe_enum"]
           user_id: string
         }
@@ -66,7 +69,7 @@ export type Database = {
           id?: number
           notes?: string | null
           priority?: Database["public"]["Enums"]["priority_enum"]
-          purpose?: Database["public"]["Enums"]["future_expense_enum"]
+          purpose?: Database["public"]["Enums"]["future_expense_enumm"]
           timeframe?: Database["public"]["Enums"]["timeframe_enum"]
           user_id?: string
         }
@@ -195,12 +198,16 @@ export type Database = {
         | "Utility Bills"
         | "Medical"
         | "Others"
-      future_expense_enum:
-        | "vacation"
-        | "education"
-        | "home_purchase"
-        | "retirement"
-        | "other"
+      future_expense_enumm:
+        | "House Purchase"
+        | "Car Purchase"
+        | "Education"
+        | "Wedding"
+        | "Medical Treatment"
+        | "Vacation"
+        | "Home Renovation"
+        | "Business Startup"
+        | "Other"
       investment_type:
         | "Gold"
         | "Fixed Deposit"
@@ -211,12 +218,19 @@ export type Database = {
         | "National Pension Scheme"
         | "Bonds"
         | "Others"
-      priority_enum: "low" | "medium" | "high"
+      priority_enum: "Low" | "Medium" | "High"
       risk_tolerance_enum:
         | "low - safety first"
         | "medium - balanced apporach"
         | "high - growth focused"
-      timeframe_enum: "short_term" | "medium_term" | "long_term"
+      timeframe_enum:
+        | "3 months"
+        | "6 months"
+        | "1 year"
+        | "2 years"
+        | "5 years"
+        | "10 years"
+        | "Other"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -343,12 +357,16 @@ export const Constants = {
         "Medical",
         "Others",
       ],
-      future_expense_enum: [
-        "vacation",
-        "education",
-        "home_purchase",
-        "retirement",
-        "other",
+      future_expense_enumm: [
+        "House Purchase",
+        "Car Purchase",
+        "Education",
+        "Wedding",
+        "Medical Treatment",
+        "Vacation",
+        "Home Renovation",
+        "Business Startup",
+        "Other",
       ],
       investment_type: [
         "Gold",
@@ -361,13 +379,21 @@ export const Constants = {
         "Bonds",
         "Others",
       ],
-      priority_enum: ["low", "medium", "high"],
+      priority_enum: ["Low", "Medium", "High"],
       risk_tolerance_enum: [
         "low - safety first",
         "medium - balanced apporach",
         "high - growth focused",
       ],
-      timeframe_enum: ["short_term", "medium_term", "long_term"],
+      timeframe_enum: [
+        "3 months",
+        "6 months",
+        "1 year",
+        "2 years",
+        "5 years",
+        "10 years",
+        "Other",
+      ],
     },
   },
 } as const

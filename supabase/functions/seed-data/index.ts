@@ -138,31 +138,31 @@ serve(async (req) => {
       }
     }
     
-    // Seed future expenses
+    // Seed future expenses - updated to match the correct enum values
     const futureExpenses = [
       {
         user_id: userId,
-        purpose: "education",
+        purpose: "Education",
         amount: 2000000,
-        timeframe: "medium_term",
+        timeframe: "5 years",
         priority: "high",
         notes: "Children's college education"
       },
       {
         user_id: userId,
-        purpose: "vacation",
+        purpose: "Vacation",
         amount: 300000,
-        timeframe: "short_term",
+        timeframe: "1 year",
         priority: "medium",
         notes: "Family trip to Europe"
       },
       {
         user_id: userId,
-        purpose: "retirement",
+        purpose: "House Purchase",
         amount: 10000000,
-        timeframe: "long_term",
+        timeframe: "10 years",
         priority: "high",
-        notes: "Retirement corpus goal"
+        notes: "Retirement home"
       }
     ];
     

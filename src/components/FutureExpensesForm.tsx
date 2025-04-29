@@ -20,6 +20,7 @@ interface FutureExpensesFormProps {
   onSave: (futureExpenses: FutureExpense[]) => void;
 }
 
+// Make sure these purpose options exactly match what's expected in the database enum
 const COMMON_FUTURE_EXPENSES = [
   'House Purchase',
   'Car Purchase',
