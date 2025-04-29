@@ -20,7 +20,7 @@ interface FutureExpensesFormProps {
   onSave: (futureExpenses: FutureExpense[]) => void;
 }
 
-// Make sure these purpose options exactly match what's expected in the database enum
+// IMPORTANT: These values must match EXACTLY what's in the database enum (from the screenshot)
 const COMMON_FUTURE_EXPENSES = [
   'House Purchase',
   'Car Purchase',
@@ -44,7 +44,6 @@ const TIMEFRAME_OPTIONS = [
   '6 months',
   '1 year',
   '2 years',
-  '3 years',
   '5 years',
   '10 years',
   'Other'
@@ -68,6 +67,8 @@ const FutureExpensesForm = ({ futureExpenses, onSave }: FutureExpensesFormProps)
     }
 
     const finalTimeframe = newExpense.timeframe === 'Other' ? customTimeframe : newExpense.timeframe;
+    
+    console.log("Adding expense with purpose:", newExpense.purpose); // Debug logging
     
     setFutureExpensesList([...futureExpensesList, { 
       ...newExpense, 
@@ -95,8 +96,8 @@ const FutureExpensesForm = ({ futureExpenses, onSave }: FutureExpensesFormProps)
   };
 
   const handleSave = () => {
+    console.log("Saving future expenses:", futureExpensesList); // Debug logging
     onSave(futureExpensesList);
-    toast.success('Future expenses saved successfully');
   };
 
   return (

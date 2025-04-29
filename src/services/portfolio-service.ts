@@ -1,3 +1,4 @@
+
 // Updated Portfolio service to use Supabase
 
 import { supabase } from "@/integrations/supabase/client";
@@ -70,19 +71,18 @@ type PurposeType = Database["public"]["Enums"]["future_expense_enumm"];
 type TimeframeType = Database["public"]["Enums"]["timeframe_enum"];
 type PriorityType = Database["public"]["Enums"]["priority_enum"];
 
-// Map frontend purpose to database enum
+// Map frontend purpose to database enum - FIXED to match exact database values from the screenshot
 const mapPurposeToEnum = (purpose: string): PurposeType => {
-  switch (purpose.toLowerCase()) {
-    case 'vacation': return 'Vacation';
-    case 'education': return 'Education';
-    case 'house purchase': return 'House Purchase'; // Fixed to match the exact enum value
-    case 'car purchase': return 'Car Purchase';
-    case 'medical treatment': return 'Medical Treatment';
-    case 'home renovation': return 'Home Renovation';
-    case 'business startup': return 'Business Startup';
-    case 'wedding': return 'Wedding';
-    default: return 'Other';
-  }
+  // Using a direct mapping approach to ensure exact matches with the database enum
+  if (purpose === 'House Purchase') return 'House Purchase';
+  if (purpose === 'Car Purchase') return 'Car Purchase';
+  if (purpose === 'Education') return 'Education';
+  if (purpose === 'Wedding') return 'Wedding';
+  if (purpose === 'Medical Treatment') return 'Medical Treatment';
+  if (purpose === 'Vacation') return 'Vacation';
+  if (purpose === 'Home Renovation') return 'Home Renovation';
+  if (purpose === 'Business Startup') return 'Business Startup';
+  return 'Other'; // Default fallback
 };
 
 // Map timeframe to database enum
@@ -94,6 +94,14 @@ const mapTimeframeToEnum = (timeframe: string): TimeframeType => {
   if (timeframe === '5 years') return '5 years';
   if (timeframe === '10 years') return '10 years';
   return 'Other';
+};
+
+// Map priority to database enum
+const mapPriorityToEnum = (priority: 'low' | 'medium' | 'high'): PriorityType => {
+  if (priority === 'low') return 'Low';
+  if (priority === 'medium') return 'Medium';
+  if (priority === 'high') return 'High';
+  return 'Medium'; // Default fallback
 };
 
 export interface FutureExpense {
@@ -140,31 +148,28 @@ const mockMutualFunds: MutualFund[] = [
 
 // Map investment type string to database enum
 const mapInvestmentTypeToEnum = (type: string): InvestmentType => {
-  switch (type) {
-    case 'Gold': return 'Gold';
-    case 'Fixed Deposit': return 'Fixed Deposit';
-    case 'Real Estate': return 'Real Estate';
-    case 'Bank Deposit': return 'Bank Deposit';
-    case 'PPF': return 'PPF';
-    case 'EPF': return 'EPF';
-    case 'National Pension Scheme': return 'National Pension Scheme';
-    case 'Bonds': return 'Bonds';
-    default: return 'Others';
-  }
+  // Direct mapping based on the exact enum values from the screenshot
+  if (type === 'Gold') return 'Gold';
+  if (type === 'Fixed Deposit') return 'Fixed Deposit';
+  if (type === 'Real Estate') return 'Real Estate';
+  if (type === 'Bank Deposit') return 'Bank Deposit';
+  if (type === 'PPF') return 'PPF';
+  if (type === 'EPF') return 'EPF';
+  if (type === 'National Pension Scheme') return 'National Pension Scheme';
+  if (type === 'Bonds') return 'Bonds';
+  return 'Others'; // Default fallback
 };
 
 // Map expense type string to database enum
 const mapExpenseTypeToEnum = (type: string): ExpenseType => {
-  switch (type) {
-    case 'EMI': return 'EMI';
-    case 'Rent': return 'Rent';
-    case 'School Fees': return 'School Fees';
-    case 'Loan Payment': return 'Loan Payment';
-    case 'Insurance Premium': return 'Insurance Premium';
-    case 'Utility Bills': return 'Utility Bills';
-    case 'Medical': return 'Medical';
-    default: return 'Others';
-  }
+  if (type === 'EMI') return 'EMI';
+  if (type === 'Rent') return 'Rent';
+  if (type === 'School Fees') return 'School Fees';
+  if (type === 'Loan Payment') return 'Loan Payment';
+  if (type === 'Insurance Premium') return 'Insurance Premium';
+  if (type === 'Utility Bills') return 'Utility Bills';
+  if (type === 'Medical') return 'Medical';
+  return 'Others'; // Default fallback
 };
 
 // Portfolio service using Supabase
@@ -249,24 +254,25 @@ const PortfolioService = {
       
       // Then insert new investments
       if (investments.length > 0) {
-        // Map investments to the database schema with proper types
-        const formattedInvestments = investments.map(investment => ({
-          user_id: user.id,
-          investment_type: mapInvestmentTypeToEnum(investment.type),
-          investment_name: investment.name,
-          amount: investment.amount,
-          notes: investment.notes || null
-        }));
-        
         // Insert investments one by one to avoid type errors with bulk insert
-        for (const investment of formattedInvestments) {
+        for (const investment of investments) {
+          const formattedInvestment = {
+            user_id: user.id,
+            investment_type: mapInvestmentTypeToEnum(investment.type),
+            investment_name: investment.name,
+            amount: investment.amount,
+            notes: investment.notes || null
+          };
+          
+          console.log("Saving investment:", formattedInvestment); // Debug logging
+          
           const { error: insertError } = await supabase
             .from('external_investments')
-            .insert(investment);
+            .insert(formattedInvestment);
           
           if (insertError) {
             console.error("Insert error:", insertError);
-            toast.error("Failed to save investment: " + investment.investment_name);
+            toast.error("Failed to save investment: " + investment.name);
             return false;
           }
         }
@@ -337,7 +343,7 @@ const PortfolioService = {
       
       // Then insert new expenses
       if (expenses.length > 0) {
-        // Map expenses to the database schema with proper enum types
+        // Process each expense individually for better error handling
         for (const expense of expenses) {
           const formattedExpense = {
             user_id: user.id,
@@ -347,6 +353,8 @@ const PortfolioService = {
             frequency: mapFrequencyToEnum(expense.frequency),
             notes: expense.notes || null
           };
+          
+          console.log("Saving expense:", formattedExpense); // Debug logging
           
           const { error: insertError } = await supabase
             .from('regular_expenses')
@@ -429,16 +437,24 @@ const PortfolioService = {
         // Process each expense individually for better error handling
         for (const expense of futureExpenses) {
           // Map to the database schema with proper enum types
+          // Important: Use exact enum values as defined in the database
+          const mappedPurpose = mapPurposeToEnum(expense.purpose);
+          const mappedTimeframe = mapTimeframeToEnum(expense.timeframe);
+          const mappedPriority = mapPriorityToEnum(expense.priority);
+          
           const formattedExpense = {
             user_id: user.id,
-            purpose: mapPurposeToEnum(expense.purpose),
+            purpose: mappedPurpose,
             amount: expense.amount,
-            timeframe: mapTimeframeToEnum(expense.timeframe),
-            priority: expense.priority.toLowerCase() as PriorityType, // Ensure lowercase for consistency
+            timeframe: mappedTimeframe,
+            priority: mappedPriority,
             notes: expense.notes || null
           };
           
-          console.log("Saving future expense:", formattedExpense); // Add debug logging
+          console.log("DEBUG - Saving future expense:", {
+            original: expense,
+            formatted: formattedExpense
+          });
           
           const { error: insertError } = await supabase
             .from('future_expenses')
@@ -485,7 +501,7 @@ const PortfolioService = {
         purpose: item.purpose,
         amount: item.amount,
         timeframe: item.timeframe,
-        priority: item.priority as 'low' | 'medium' | 'high',
+        priority: item.priority.toLowerCase() as 'low' | 'medium' | 'high',
         notes: item.notes
       }));
     } catch (error) {

@@ -54,7 +54,7 @@ serve(async (req) => {
     await supabaseClient.from('regular_expenses').delete().eq('user_id', userId);
     await supabaseClient.from('future_expenses').delete().eq('user_id', userId);
 
-    // Seed external investments
+    // Seed external investments - Using exact enum values from the database
     const externalInvestments = [
       {
         user_id: userId,
@@ -98,7 +98,7 @@ serve(async (req) => {
       }
     }
     
-    // Seed regular expenses
+    // Seed regular expenses - Using exact enum values from the database
     const regularExpenses = [
       {
         user_id: userId,
@@ -138,14 +138,14 @@ serve(async (req) => {
       }
     }
     
-    // Seed future expenses - updated to match the correct enum values
+    // Seed future expenses - Using exact enum values from the database
     const futureExpenses = [
       {
         user_id: userId,
         purpose: "Education",
         amount: 2000000,
         timeframe: "5 years",
-        priority: "high",
+        priority: "High",
         notes: "Children's college education"
       },
       {
@@ -153,7 +153,7 @@ serve(async (req) => {
         purpose: "Vacation",
         amount: 300000,
         timeframe: "1 year",
-        priority: "medium",
+        priority: "Medium",
         notes: "Family trip to Europe"
       },
       {
@@ -161,7 +161,7 @@ serve(async (req) => {
         purpose: "House Purchase",
         amount: 10000000,
         timeframe: "10 years",
-        priority: "high",
+        priority: "High",
         notes: "Retirement home"
       }
     ];
