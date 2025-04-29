@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -48,6 +48,11 @@ const ExpensesForm = ({ expenses, onSave }: ExpensesFormProps) => {
     notes: ''
   });
 
+  // Update expenses list when props change
+  useEffect(() => {
+    setExpensesList(expenses || []);
+  }, [expenses]);
+
   const handleAddExpense = () => {
     if (!newExpense.type || !newExpense.name || newExpense.amount <= 0) {
       toast.error('Please fill all required fields with valid values');
@@ -75,7 +80,6 @@ const ExpensesForm = ({ expenses, onSave }: ExpensesFormProps) => {
 
   const handleSave = () => {
     onSave(expensesList);
-    toast.success('Expenses saved successfully');
   };
 
   return (
@@ -96,7 +100,7 @@ const ExpensesForm = ({ expenses, onSave }: ExpensesFormProps) => {
               <div className="space-y-2">
                 {expensesList.map((expense, index) => (
                   <div 
-                    key={index} 
+                    key={expense.id || index} 
                     className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
                   >
                     <div>

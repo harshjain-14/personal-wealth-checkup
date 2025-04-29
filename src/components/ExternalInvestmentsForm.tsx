@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -41,6 +41,11 @@ const ExternalInvestmentsForm = ({ investments, onSave }: ExternalInvestmentsFor
     notes: ''
   });
 
+  // Update the investments list when props change
+  useEffect(() => {
+    setInvestmentsList(investments || []);
+  }, [investments]);
+
   const handleAddInvestment = () => {
     if (!newInvestment.type || !newInvestment.name || newInvestment.amount <= 0) {
       toast.error('Please fill all required fields with valid values');
@@ -67,7 +72,6 @@ const ExternalInvestmentsForm = ({ investments, onSave }: ExternalInvestmentsFor
 
   const handleSave = () => {
     onSave(investmentsList);
-    toast.success('External investments saved successfully');
   };
 
   return (
@@ -88,7 +92,7 @@ const ExternalInvestmentsForm = ({ investments, onSave }: ExternalInvestmentsFor
               <div className="space-y-2">
                 {investmentsList.map((investment, index) => (
                   <div 
-                    key={index} 
+                    key={investment.id || index} 
                     className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
                   >
                     <div>

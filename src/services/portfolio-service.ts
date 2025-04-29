@@ -26,6 +26,7 @@ export interface ExternalInvestment {
   name: string;
   amount: number;
   notes?: string;
+  id?: number; // Adding ID to track existing records
 }
 
 export interface Expense {
@@ -34,6 +35,7 @@ export interface Expense {
   amount: number;
   frequency: 'monthly' | 'quarterly' | 'yearly' | 'one-time';
   notes?: string;
+  id?: number; // Adding ID to track existing records
 }
 
 export interface FutureExpense {
@@ -42,6 +44,7 @@ export interface FutureExpense {
   timeframe: string; // e.g., "6 months", "2 years"
   priority: 'low' | 'medium' | 'high';
   notes?: string;
+  id?: number; // Adding ID to track existing records
 }
 
 export interface UserInfo {
@@ -159,15 +162,18 @@ const PortfolioService = {
       
       // Then insert new investments
       if (investments.length > 0) {
+        // Map investments to the database schema
+        const formattedInvestments = investments.map(investment => ({
+          user_id: user.id,
+          investment_type: investment.type,
+          investment_name: investment.name,
+          amount: investment.amount,
+          notes: investment.notes || null
+        }));
+        
         const { error: insertError } = await supabase
           .from('external_investments')
-          .insert(investments.map(investment => ({
-            user_id: user.id,
-            investment_type: investment.type,
-            investment_name: investment.name,
-            amount: investment.amount,
-            notes: investment.notes
-          })));
+          .insert(formattedInvestments);
         
         if (insertError) {
           console.error("Insert error:", insertError);
@@ -205,6 +211,7 @@ const PortfolioService = {
       }
       
       return data.map(item => ({
+        id: item.id,
         type: item.investment_type,
         name: item.investment_name,
         amount: item.amount,
@@ -240,16 +247,19 @@ const PortfolioService = {
       
       // Then insert new expenses
       if (expenses.length > 0) {
+        // Map expenses to the database schema
+        const formattedExpenses = expenses.map(expense => ({
+          user_id: user.id,
+          expense_type: expense.type,
+          description: expense.name,
+          amount: expense.amount,
+          frequency: expense.frequency.toUpperCase(),
+          notes: expense.notes || null
+        }));
+        
         const { error: insertError } = await supabase
           .from('regular_expenses')
-          .insert(expenses.map(expense => ({
-            user_id: user.id,
-            expense_type: expense.type,
-            description: expense.name,
-            amount: expense.amount,
-            frequency: expense.frequency,
-            notes: expense.notes
-          })));
+          .insert(formattedExpenses);
         
         if (insertError) {
           console.error("Insert error:", insertError);
@@ -287,10 +297,11 @@ const PortfolioService = {
       }
       
       return data.map(item => ({
+        id: item.id,
         type: item.expense_type,
         name: item.description,
         amount: item.amount,
-        frequency: item.frequency,
+        frequency: item.frequency.toLowerCase(),
         notes: item.notes
       }));
     } catch (error) {
@@ -323,16 +334,18 @@ const PortfolioService = {
       
       // Then insert new future expenses
       if (futureExpenses.length > 0) {
+        const formattedExpenses = futureExpenses.map(expense => ({
+          user_id: user.id,
+          purpose: expense.purpose,
+          amount: expense.amount,
+          timeframe: expense.timeframe,
+          priority: expense.priority,
+          notes: expense.notes || null
+        }));
+        
         const { error: insertError } = await supabase
           .from('future_expenses')
-          .insert(futureExpenses.map(expense => ({
-            user_id: user.id,
-            purpose: expense.purpose,
-            amount: expense.amount,
-            timeframe: expense.timeframe,
-            priority: expense.priority,
-            notes: expense.notes
-          })));
+          .insert(formattedExpenses);
         
         if (insertError) {
           console.error("Insert error:", insertError);
@@ -370,6 +383,7 @@ const PortfolioService = {
       }
       
       return data.map(item => ({
+        id: item.id,
         purpose: item.purpose,
         amount: item.amount,
         timeframe: item.timeframe,
@@ -392,15 +406,26 @@ const PortfolioService = {
         return false;
       }
       
+      // For risk_tolerance, match the enum format in database
+      let riskToleranceValue: string | null = null;
+      if (userInfo.riskTolerance === 'low') {
+        riskToleranceValue = "low - safety first";
+      } else if (userInfo.riskTolerance === 'medium') {
+        riskToleranceValue = "medium - balanced apporach";
+      } else if (userInfo.riskTolerance === 'high') {
+        riskToleranceValue = "high - growth focused";
+      }
+      
       const { error } = await supabase
         .from('personal_info')
         .upsert([
           {
+            id: user.id, // Use user.id as the primary key
             user_id: user.id,
             age: userInfo.age,
             city: userInfo.city,
-            risk_tolerance: userInfo.riskTolerance,
-            financial_goals: userInfo.financialGoals
+            risk_tolerance: riskToleranceValue,
+            financial_goals: userInfo.financialGoals || []
           }
         ]);
       
@@ -441,10 +466,20 @@ const PortfolioService = {
         return null;
       }
       
+      // Map the risk_tolerance from db format to frontend format
+      let riskTolerance: 'low' | 'medium' | 'high' | undefined;
+      if (data.risk_tolerance === 'low - safety first') {
+        riskTolerance = 'low';
+      } else if (data.risk_tolerance === 'medium - balanced apporach') {
+        riskTolerance = 'medium';
+      } else if (data.risk_tolerance === 'high - growth focused') {
+        riskTolerance = 'high';
+      }
+      
       return {
         age: data.age,
         city: data.city,
-        riskTolerance: data.risk_tolerance,
+        riskTolerance: riskTolerance,
         financialGoals: data.financial_goals
       };
     } catch (error) {

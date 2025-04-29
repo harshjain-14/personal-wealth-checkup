@@ -1,10 +1,10 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.29.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.42.6";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 serve(async (req) => {
@@ -14,226 +14,188 @@ serve(async (req) => {
   }
 
   try {
-    // Create a Supabase client
+    // Get the supabase client
     const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      {
+        global: {
+          headers: { Authorization: req.headers.get("Authorization")! },
+        },
+      }
     );
-    
+
     // Get the request body
-    const { userId } = await req.json();
-    
+    const requestData = await req.json();
+    const { userId } = requestData;
+
     if (!userId) {
       return new Response(
-        JSON.stringify({ error: "User ID is required" }),
+        JSON.stringify({ success: false, message: "User ID is required" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
     }
-    
-    // Check if the user exists
-    const { data: userData, error: userError } = await supabaseClient
-      .from('profiles')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-    
-    if (userError && userError.code !== "PGRST116") { // PGRST116 means no rows found
-      throw userError;
+
+    // Verify auth
+    const {
+      data: { user },
+      error: authError,
+    } = await supabaseClient.auth.getUser();
+
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ success: false, message: "Unauthorized" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+      );
     }
-    
-    // Create a profile if it doesn't exist
-    if (!userData) {
-      const { error: profileError } = await supabaseClient
-        .from('profiles')
-        .insert([{ user_id: userId, additional_info: 'Seed profile' }]);
-      
-      if (profileError) {
-        throw profileError;
-      }
-    }
-    
-    // Seed personal info
-    const { error: personalInfoError } = await supabaseClient
-      .from('personal_info')
-      .upsert([
-        {
-          user_id: userId,
-          age: 32,
-          city: 'Mumbai',
-          risk_tolerance: 'medium',
-          financial_goals: ['Retirement', 'Home Purchase', 'Wealth Creation']
-        }
-      ]);
-    
-    if (personalInfoError) {
-      throw personalInfoError;
-    }
-    
+
+    // Clear existing user data
+    await supabaseClient.from('external_investments').delete().eq('user_id', userId);
+    await supabaseClient.from('regular_expenses').delete().eq('user_id', userId);
+    await supabaseClient.from('future_expenses').delete().eq('user_id', userId);
+
     // Seed external investments
     const externalInvestments = [
       {
         user_id: userId,
-        investment_type: 'FD',
-        investment_name: 'HDFC Bank Fixed Deposit',
-        amount: 100000,
-        notes: '5.5% interest for 3 years'
+        investment_type: "Gold",
+        investment_name: "Gold ETF",
+        amount: 250000,
+        notes: "SBI Gold ETF"
       },
       {
         user_id: userId,
-        investment_type: 'Gold',
-        investment_name: 'Digital Gold',
-        amount: 50000,
-        notes: 'Purchased through PhonePe'
+        investment_type: "Fixed Deposit",
+        investment_name: "Bank FD",
+        amount: 500000,
+        notes: "Matures in 2026, 6.5% interest"
       },
       {
         user_id: userId,
-        investment_type: 'Real Estate',
-        investment_name: 'Apartment in Pune',
-        amount: 3000000,
-        notes: 'Rental property'
+        investment_type: "PPF",
+        investment_name: "Public Provident Fund",
+        amount: 350000,
+        notes: "Tax-free investment"
+      },
+      {
+        user_id: userId,
+        investment_type: "Real Estate",
+        investment_name: "Apartment",
+        amount: 8000000,
+        notes: "2BHK in Bangalore"
       }
     ];
     
-    // Delete existing external investments first
-    await supabaseClient
-      .from('external_investments')
-      .delete()
-      .eq('user_id', userId);
-    
-    // Insert new external investments
     const { error: investmentsError } = await supabaseClient
       .from('external_investments')
       .insert(externalInvestments);
     
     if (investmentsError) {
-      throw investmentsError;
+      console.error("Error seeding investments:", investmentsError);
+      throw new Error(investmentsError.message);
     }
     
     // Seed regular expenses
     const regularExpenses = [
       {
         user_id: userId,
-        expense_type: 'Housing',
-        description: 'Rent',
+        expense_type: "EMI",
+        description: "Home Loan EMI",
+        amount: 35000,
+        frequency: "MONTHLY",
+        notes: "20-year loan, 7.5% interest"
+      },
+      {
+        user_id: userId,
+        expense_type: "Insurance Premium",
+        description: "Health Insurance",
         amount: 25000,
-        frequency: 'monthly',
-        notes: 'Apartment in Bandra'
+        frequency: "YEARLY",
+        notes: "Family floater policy"
       },
       {
         user_id: userId,
-        expense_type: 'Utilities',
-        description: 'Electricity',
-        amount: 3000,
-        frequency: 'monthly',
-        notes: 'Average bill'
-      },
-      {
-        user_id: userId,
-        expense_type: 'Transportation',
-        description: 'Fuel',
-        amount: 5000,
-        frequency: 'monthly',
-        notes: 'For personal vehicle'
-      },
-      {
-        user_id: userId,
-        expense_type: 'Insurance',
-        description: 'Health Insurance Premium',
-        amount: 15000,
-        frequency: 'yearly',
-        notes: 'Family floater policy'
+        expense_type: "School Fees",
+        description: "School Tuition",
+        amount: 50000,
+        frequency: "QUARTERLY",
+        notes: "For two children"
       }
     ];
     
-    // Delete existing regular expenses first
-    await supabaseClient
-      .from('regular_expenses')
-      .delete()
-      .eq('user_id', userId);
-    
-    // Insert new regular expenses
     const { error: expensesError } = await supabaseClient
       .from('regular_expenses')
       .insert(regularExpenses);
     
     if (expensesError) {
-      throw expensesError;
+      console.error("Error seeding expenses:", expensesError);
+      throw new Error(expensesError.message);
     }
     
     // Seed future expenses
     const futureExpenses = [
       {
         user_id: userId,
-        purpose: 'House Down Payment',
-        amount: 1500000,
-        timeframe: '3 years',
-        priority: 'high',
-        notes: 'For apartment in Mumbai'
-      },
-      {
-        user_id: userId,
-        purpose: 'Car Purchase',
-        amount: 800000,
-        timeframe: '1 year',
-        priority: 'medium',
-        notes: 'SUV'
-      },
-      {
-        user_id: userId,
-        purpose: 'Higher Education',
-        amount: 1000000,
-        timeframe: '5 years',
-        priority: 'medium',
-        notes: 'MBA program'
-      },
-      {
-        user_id: userId,
-        purpose: 'Wedding',
+        purpose: "education",
         amount: 2000000,
-        timeframe: '2 years',
-        priority: 'high',
-        notes: 'Estimated expenses'
+        timeframe: "medium_term",
+        priority: "high",
+        notes: "Children's college education"
+      },
+      {
+        user_id: userId,
+        purpose: "vacation",
+        amount: 300000,
+        timeframe: "short_term",
+        priority: "medium",
+        notes: "Family trip to Europe"
+      },
+      {
+        user_id: userId,
+        purpose: "retirement",
+        amount: 10000000,
+        timeframe: "long_term",
+        priority: "high",
+        notes: "Retirement corpus goal"
       }
     ];
     
-    // Delete existing future expenses first
-    await supabaseClient
-      .from('future_expenses')
-      .delete()
-      .eq('user_id', userId);
-    
-    // Insert new future expenses
     const { error: futureExpensesError } = await supabaseClient
       .from('future_expenses')
       .insert(futureExpenses);
     
     if (futureExpensesError) {
-      throw futureExpensesError;
+      console.error("Error seeding future expenses:", futureExpensesError);
+      throw new Error(futureExpensesError.message);
     }
     
-    // Seed Zerodha credentials
-    const { error: zerodhaError } = await supabaseClient
-      .from('zerodha_credentials')
-      .upsert([
-        {
-          user_id: userId,
-          zerodha_user_id: 'ZR12345'
-        }
-      ]);
+    // Seed personal info
+    const personalInfo = {
+      id: userId,
+      user_id: userId,
+      age: 35,
+      city: "Mumbai",
+      risk_tolerance: "medium - balanced apporach",
+      financial_goals: ["Retirement", "Children's Education", "Wealth Creation", "Travel"]
+    };
     
-    if (zerodhaError) {
-      throw zerodhaError;
+    const { error: personalInfoError } = await supabaseClient
+      .from('personal_info')
+      .upsert([personalInfo]);
+    
+    if (personalInfoError) {
+      console.error("Error seeding personal info:", personalInfoError);
+      throw new Error(personalInfoError.message);
     }
     
     return new Response(
-      JSON.stringify({ success: true, message: "Dummy data seeded successfully" }),
+      JSON.stringify({ success: true, message: "Sample data seeded successfully" }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
   } catch (error) {
     console.error("Error seeding data:", error);
-    
     return new Response(
-      JSON.stringify({ error: error.message || "Failed to seed data" }),
+      JSON.stringify({ success: false, message: error.message }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
     );
   }

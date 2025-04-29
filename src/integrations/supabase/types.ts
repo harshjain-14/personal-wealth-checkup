@@ -129,7 +129,7 @@ export type Database = {
           created_at: string | null
           description: string
           expense_type: Database["public"]["Enums"]["expense_type_enum"]
-          frequency: Database["public"]["Enums"]["frequency_enum"]
+          frequency: Database["public"]["Enums"]["expense_frequency_enum"]
           id: number
           notes: string | null
           user_id: string
@@ -139,7 +139,7 @@ export type Database = {
           created_at?: string | null
           description: string
           expense_type: Database["public"]["Enums"]["expense_type_enum"]
-          frequency: Database["public"]["Enums"]["frequency_enum"]
+          frequency: Database["public"]["Enums"]["expense_frequency_enum"]
           id?: number
           notes?: string | null
           user_id: string
@@ -149,7 +149,7 @@ export type Database = {
           created_at?: string | null
           description?: string
           expense_type?: Database["public"]["Enums"]["expense_type_enum"]
-          frequency?: Database["public"]["Enums"]["frequency_enum"]
+          frequency?: Database["public"]["Enums"]["expense_frequency_enum"]
           id?: number
           notes?: string | null
           user_id?: string
@@ -185,13 +185,16 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      expense_frequency_enum: "Monthly" | "Quarterly" | "Yearly" | "One-time"
       expense_type_enum:
-        | "food"
-        | "transportation"
-        | "utilities"
-        | "entertainment"
-        | "other"
-      frequency_enum: "daily" | "weekly" | "monthly" | "yearly"
+        | "EMI"
+        | "Rent"
+        | "School Fees"
+        | "Loan Payment"
+        | "Insurance Premium"
+        | "Utility Bills"
+        | "Medical"
+        | "Others"
       future_expense_enum:
         | "vacation"
         | "education"
@@ -199,11 +202,15 @@ export type Database = {
         | "retirement"
         | "other"
       investment_type:
-        | "stocks"
-        | "bonds"
-        | "mutual_funds"
-        | "real_estate"
-        | "cryptocurrency"
+        | "Gold"
+        | "Fixed Deposit"
+        | "Real Estate"
+        | "Bank Deposit"
+        | "PPF"
+        | "EPF"
+        | "National Pension Scheme"
+        | "Bonds"
+        | "Others"
       priority_enum: "low" | "medium" | "high"
       risk_tolerance_enum:
         | "low - safety first"
@@ -325,14 +332,17 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      expense_frequency_enum: ["Monthly", "Quarterly", "Yearly", "One-time"],
       expense_type_enum: [
-        "food",
-        "transportation",
-        "utilities",
-        "entertainment",
-        "other",
+        "EMI",
+        "Rent",
+        "School Fees",
+        "Loan Payment",
+        "Insurance Premium",
+        "Utility Bills",
+        "Medical",
+        "Others",
       ],
-      frequency_enum: ["daily", "weekly", "monthly", "yearly"],
       future_expense_enum: [
         "vacation",
         "education",
@@ -341,11 +351,15 @@ export const Constants = {
         "other",
       ],
       investment_type: [
-        "stocks",
-        "bonds",
-        "mutual_funds",
-        "real_estate",
-        "cryptocurrency",
+        "Gold",
+        "Fixed Deposit",
+        "Real Estate",
+        "Bank Deposit",
+        "PPF",
+        "EPF",
+        "National Pension Scheme",
+        "Bonds",
+        "Others",
       ],
       priority_enum: ["low", "medium", "high"],
       risk_tolerance_enum: [
