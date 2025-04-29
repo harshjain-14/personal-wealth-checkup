@@ -86,13 +86,16 @@ serve(async (req) => {
       }
     ];
     
-    const { error: investmentsError } = await supabaseClient
-      .from('external_investments')
-      .insert(externalInvestments);
-    
-    if (investmentsError) {
-      console.error("Error seeding investments:", investmentsError);
-      throw new Error(investmentsError.message);
+    // Insert investments one by one to avoid type errors
+    for (const investment of externalInvestments) {
+      const { error: investmentError } = await supabaseClient
+        .from('external_investments')
+        .insert(investment);
+      
+      if (investmentError) {
+        console.error("Error seeding investment:", investmentError);
+        throw new Error(investmentError.message);
+      }
     }
     
     // Seed regular expenses
@@ -102,7 +105,7 @@ serve(async (req) => {
         expense_type: "EMI",
         description: "Home Loan EMI",
         amount: 35000,
-        frequency: "MONTHLY",
+        frequency: "Monthly",
         notes: "20-year loan, 7.5% interest"
       },
       {
@@ -110,7 +113,7 @@ serve(async (req) => {
         expense_type: "Insurance Premium",
         description: "Health Insurance",
         amount: 25000,
-        frequency: "YEARLY",
+        frequency: "Yearly",
         notes: "Family floater policy"
       },
       {
@@ -118,18 +121,21 @@ serve(async (req) => {
         expense_type: "School Fees",
         description: "School Tuition",
         amount: 50000,
-        frequency: "QUARTERLY",
+        frequency: "Quarterly",
         notes: "For two children"
       }
     ];
     
-    const { error: expensesError } = await supabaseClient
-      .from('regular_expenses')
-      .insert(regularExpenses);
-    
-    if (expensesError) {
-      console.error("Error seeding expenses:", expensesError);
-      throw new Error(expensesError.message);
+    // Insert expenses one by one
+    for (const expense of regularExpenses) {
+      const { error: expenseError } = await supabaseClient
+        .from('regular_expenses')
+        .insert(expense);
+      
+      if (expenseError) {
+        console.error("Error seeding expense:", expenseError);
+        throw new Error(expenseError.message);
+      }
     }
     
     // Seed future expenses
@@ -160,13 +166,16 @@ serve(async (req) => {
       }
     ];
     
-    const { error: futureExpensesError } = await supabaseClient
-      .from('future_expenses')
-      .insert(futureExpenses);
-    
-    if (futureExpensesError) {
-      console.error("Error seeding future expenses:", futureExpensesError);
-      throw new Error(futureExpensesError.message);
+    // Insert future expenses one by one
+    for (const futureExpense of futureExpenses) {
+      const { error: futureExpenseError } = await supabaseClient
+        .from('future_expenses')
+        .insert(futureExpense);
+      
+      if (futureExpenseError) {
+        console.error("Error seeding future expense:", futureExpenseError);
+        throw new Error(futureExpenseError.message);
+      }
     }
     
     // Seed personal info

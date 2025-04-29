@@ -3,8 +3,9 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Database } from "@/integrations/supabase/types";
 
-// Types
+// Types that match our frontend UI components
 export interface Stock {
   symbol: string;
   name: string;
@@ -21,13 +22,41 @@ export interface MutualFund {
   category: string;
 }
 
+// Type that matches the database schema
+type InvestmentType = Database["public"]["Enums"]["investment_type"];
+
 export interface ExternalInvestment {
   type: string;
   name: string;
   amount: number;
   notes?: string;
-  id?: number; // Adding ID to track existing records
+  id?: number;
 }
+
+type ExpenseType = Database["public"]["Enums"]["expense_type_enum"];
+type ExpenseFrequency = Database["public"]["Enums"]["expense_frequency_enum"];
+
+// Map frontend frequency to database enum
+const mapFrequencyToEnum = (freq: string): ExpenseFrequency => {
+  switch (freq.toLowerCase()) {
+    case 'monthly': return 'Monthly';
+    case 'quarterly': return 'Quarterly';
+    case 'yearly': return 'Yearly';
+    case 'one-time': return 'One-time';
+    default: return 'Monthly'; // Default fallback
+  }
+};
+
+// Map database enum to frontend frequency
+const mapEnumToFrequency = (freq: ExpenseFrequency): 'monthly' | 'quarterly' | 'yearly' | 'one-time' => {
+  switch (freq) {
+    case 'Monthly': return 'monthly';
+    case 'Quarterly': return 'quarterly';
+    case 'Yearly': return 'yearly';
+    case 'One-time': return 'one-time';
+    default: return 'monthly'; // Default fallback
+  }
+};
 
 export interface Expense {
   type: string;
@@ -35,16 +64,43 @@ export interface Expense {
   amount: number;
   frequency: 'monthly' | 'quarterly' | 'yearly' | 'one-time';
   notes?: string;
-  id?: number; // Adding ID to track existing records
+  id?: number;
 }
+
+type PurposeType = Database["public"]["Enums"]["future_expense_enum"];
+type TimeframeType = Database["public"]["Enums"]["timeframe_enum"];
+type PriorityType = Database["public"]["Enums"]["priority_enum"];
+
+// Map frontend purpose to database enum
+const mapPurposeToEnum = (purpose: string): PurposeType => {
+  switch (purpose.toLowerCase()) {
+    case 'vacation': return 'vacation';
+    case 'education': return 'education';
+    case 'house purchase': return 'home_purchase';
+    case 'car purchase': return 'other';
+    case 'retirement': return 'retirement';
+    default: return 'other';
+  }
+};
+
+// Map timeframe to database enum
+const mapTimeframeToEnum = (timeframe: string): TimeframeType => {
+  if (timeframe.includes('year') || parseInt(timeframe) > 5) {
+    return 'long_term';
+  } else if (timeframe.includes('month') || parseInt(timeframe) <= 1) {
+    return 'short_term';
+  } else {
+    return 'medium_term';
+  }
+};
 
 export interface FutureExpense {
   purpose: string;
   amount: number;
-  timeframe: string; // e.g., "6 months", "2 years"
+  timeframe: string;
   priority: 'low' | 'medium' | 'high';
   notes?: string;
-  id?: number; // Adding ID to track existing records
+  id?: number;
 }
 
 export interface UserInfo {
@@ -79,6 +135,35 @@ const mockMutualFunds: MutualFund[] = [
   { name: "Axis Bluechip Fund", investedAmount: 75000, currentValue: 82000, category: "Large Cap" },
   { name: "SBI Small Cap Fund", investedAmount: 40000, currentValue: 46000, category: "Small Cap" },
 ];
+
+// Map investment type string to database enum
+const mapInvestmentTypeToEnum = (type: string): InvestmentType => {
+  switch (type) {
+    case 'Gold': return 'Gold';
+    case 'Fixed Deposit': return 'Fixed Deposit';
+    case 'Real Estate': return 'Real Estate';
+    case 'Bank Deposit': return 'Bank Deposit';
+    case 'PPF': return 'PPF';
+    case 'EPF': return 'EPF';
+    case 'National Pension Scheme': return 'National Pension Scheme';
+    case 'Bonds': return 'Bonds';
+    default: return 'Others';
+  }
+};
+
+// Map expense type string to database enum
+const mapExpenseTypeToEnum = (type: string): ExpenseType => {
+  switch (type) {
+    case 'EMI': return 'EMI';
+    case 'Rent': return 'Rent';
+    case 'School Fees': return 'School Fees';
+    case 'Loan Payment': return 'Loan Payment';
+    case 'Insurance Premium': return 'Insurance Premium';
+    case 'Utility Bills': return 'Utility Bills';
+    case 'Medical': return 'Medical';
+    default: return 'Others';
+  }
+};
 
 // Portfolio service using Supabase
 const PortfolioService = {
@@ -162,23 +247,26 @@ const PortfolioService = {
       
       // Then insert new investments
       if (investments.length > 0) {
-        // Map investments to the database schema
+        // Map investments to the database schema with proper types
         const formattedInvestments = investments.map(investment => ({
           user_id: user.id,
-          investment_type: investment.type,
+          investment_type: mapInvestmentTypeToEnum(investment.type),
           investment_name: investment.name,
           amount: investment.amount,
           notes: investment.notes || null
         }));
         
-        const { error: insertError } = await supabase
-          .from('external_investments')
-          .insert(formattedInvestments);
-        
-        if (insertError) {
-          console.error("Insert error:", insertError);
-          toast.error("Failed to save investments");
-          return false;
+        // Insert investments one by one to avoid type errors with bulk insert
+        for (const investment of formattedInvestments) {
+          const { error: insertError } = await supabase
+            .from('external_investments')
+            .insert(investment);
+          
+          if (insertError) {
+            console.error("Insert error:", insertError);
+            toast.error("Failed to save investment: " + investment.investment_name);
+            return false;
+          }
         }
       }
       
@@ -247,24 +335,27 @@ const PortfolioService = {
       
       // Then insert new expenses
       if (expenses.length > 0) {
-        // Map expenses to the database schema
+        // Map expenses to the database schema with proper enum types
         const formattedExpenses = expenses.map(expense => ({
           user_id: user.id,
-          expense_type: expense.type,
+          expense_type: mapExpenseTypeToEnum(expense.type),
           description: expense.name,
           amount: expense.amount,
-          frequency: expense.frequency.toUpperCase(),
+          frequency: mapFrequencyToEnum(expense.frequency),
           notes: expense.notes || null
         }));
         
-        const { error: insertError } = await supabase
-          .from('regular_expenses')
-          .insert(formattedExpenses);
-        
-        if (insertError) {
-          console.error("Insert error:", insertError);
-          toast.error("Failed to save expenses");
-          return false;
+        // Insert expenses one by one to avoid type errors with bulk insert
+        for (const expense of formattedExpenses) {
+          const { error: insertError } = await supabase
+            .from('regular_expenses')
+            .insert(expense);
+          
+          if (insertError) {
+            console.error("Insert error:", insertError);
+            toast.error("Failed to save expense: " + expense.description);
+            return false;
+          }
         }
       }
       
@@ -301,7 +392,7 @@ const PortfolioService = {
         type: item.expense_type,
         name: item.description,
         amount: item.amount,
-        frequency: item.frequency.toLowerCase(),
+        frequency: mapEnumToFrequency(item.frequency),
         notes: item.notes
       }));
     } catch (error) {
@@ -334,23 +425,27 @@ const PortfolioService = {
       
       // Then insert new future expenses
       if (futureExpenses.length > 0) {
+        // Map to the database schema with proper enum types
         const formattedExpenses = futureExpenses.map(expense => ({
           user_id: user.id,
-          purpose: expense.purpose,
+          purpose: mapPurposeToEnum(expense.purpose),
           amount: expense.amount,
-          timeframe: expense.timeframe,
-          priority: expense.priority,
+          timeframe: mapTimeframeToEnum(expense.timeframe),
+          priority: expense.priority as PriorityType, // Direct mapping as enums match
           notes: expense.notes || null
         }));
         
-        const { error: insertError } = await supabase
-          .from('future_expenses')
-          .insert(formattedExpenses);
-        
-        if (insertError) {
-          console.error("Insert error:", insertError);
-          toast.error("Failed to save future expenses");
-          return false;
+        // Insert expenses one by one to avoid type errors with bulk insert
+        for (const expense of formattedExpenses) {
+          const { error: insertError } = await supabase
+            .from('future_expenses')
+            .insert(expense);
+          
+          if (insertError) {
+            console.error("Insert error:", insertError);
+            toast.error("Failed to save future expense: " + expense.purpose);
+            return false;
+          }
         }
       }
       
@@ -387,7 +482,7 @@ const PortfolioService = {
         purpose: item.purpose,
         amount: item.amount,
         timeframe: item.timeframe,
-        priority: item.priority,
+        priority: item.priority as 'low' | 'medium' | 'high',
         notes: item.notes
       }));
     } catch (error) {
@@ -407,7 +502,7 @@ const PortfolioService = {
       }
       
       // For risk_tolerance, match the enum format in database
-      let riskToleranceValue: string | null = null;
+      let riskToleranceValue: Database["public"]["Enums"]["risk_tolerance_enum"] | null = null;
       if (userInfo.riskTolerance === 'low') {
         riskToleranceValue = "low - safety first";
       } else if (userInfo.riskTolerance === 'medium') {
@@ -418,16 +513,14 @@ const PortfolioService = {
       
       const { error } = await supabase
         .from('personal_info')
-        .upsert([
-          {
-            id: user.id, // Use user.id as the primary key
-            user_id: user.id,
-            age: userInfo.age,
-            city: userInfo.city,
-            risk_tolerance: riskToleranceValue,
-            financial_goals: userInfo.financialGoals || []
-          }
-        ]);
+        .upsert({
+          id: user.id, // Use user.id as the primary key
+          user_id: user.id,
+          age: userInfo.age,
+          city: userInfo.city,
+          risk_tolerance: riskToleranceValue,
+          financial_goals: userInfo.financialGoals || []
+        });
       
       if (error) {
         console.error("Upsert error:", error);
