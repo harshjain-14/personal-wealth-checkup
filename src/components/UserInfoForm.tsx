@@ -90,13 +90,13 @@ const UserInfoForm = ({ userInfo, onSave }: UserInfoFormProps) => {
 
     const finalCity = formData.city === 'Other' ? otherCity : formData.city;
     
+    console.log("DEBUG - Submitting user info with financial goals:", selectedGoals);
+    
     onSave({
       ...formData,
       city: finalCity,
       financialGoals: selectedGoals
     });
-    
-    toast.success('Personal information saved successfully');
   };
 
   return (

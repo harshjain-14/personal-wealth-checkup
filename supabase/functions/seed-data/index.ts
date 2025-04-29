@@ -178,15 +178,17 @@ serve(async (req) => {
       }
     }
     
-    // Seed personal info
+    // Seed personal info - Making sure financial_goals is an array and risk_tolerance matches enum
     const personalInfo = {
       id: userId,
       user_id: userId,
       age: 35,
       city: "Mumbai",
-      risk_tolerance: "medium - balanced apporach",
-      financial_goals: ["Retirement", "Children's Education", "Wealth Creation", "Travel"]
+      risk_tolerance: "medium - balanced apporach", // Ensure exact match with enum value in database
+      financial_goals: ["Retirement", "Children's Education", "Wealth Creation", "Travel"] // Properly passed as an array
     };
+    
+    console.log("DEBUG - Seeding personal info:", personalInfo);
     
     const { error: personalInfoError } = await supabaseClient
       .from('personal_info')

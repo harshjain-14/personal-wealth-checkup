@@ -1,4 +1,3 @@
-
 // Updated Portfolio service to use Supabase
 
 import { supabase } from "@/integrations/supabase/client";
@@ -530,20 +529,30 @@ const PortfolioService = {
         riskToleranceValue = "high - growth focused";
       }
       
+      console.log("DEBUG - Saving user info:", {
+        userInfo,
+        mappedRiskTolerance: riskToleranceValue,
+        financialGoals: userInfo.financialGoals
+      });
+      
+      const dataToUpsert = {
+        id: user.id, // Use user.id as the primary key
+        user_id: user.id,
+        age: userInfo.age,
+        city: userInfo.city,
+        risk_tolerance: riskToleranceValue,
+        financial_goals: userInfo.financialGoals || []
+      };
+      
+      console.log("DEBUG - Data to upsert:", dataToUpsert);
+      
       const { error } = await supabase
         .from('personal_info')
-        .upsert({
-          id: user.id, // Use user.id as the primary key
-          user_id: user.id,
-          age: userInfo.age,
-          city: userInfo.city,
-          risk_tolerance: riskToleranceValue,
-          financial_goals: userInfo.financialGoals || []
-        });
+        .upsert(dataToUpsert);
       
       if (error) {
         console.error("Upsert error:", error);
-        toast.error("Failed to save personal information");
+        toast.error("Failed to save personal information: " + error.message);
         return false;
       }
       

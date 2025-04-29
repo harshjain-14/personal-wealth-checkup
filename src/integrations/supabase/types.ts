@@ -78,7 +78,7 @@ export type Database = {
       personal_info: {
         Row: {
           age: number
-          city: string
+          city: Database["public"]["Enums"]["city_enum"]
           created_at: string | null
           financial_goals: string[]
           id: string
@@ -87,7 +87,7 @@ export type Database = {
         }
         Insert: {
           age: number
-          city: string
+          city: Database["public"]["Enums"]["city_enum"]
           created_at?: string | null
           financial_goals: string[]
           id: string
@@ -96,7 +96,7 @@ export type Database = {
         }
         Update: {
           age?: number
-          city?: string
+          city?: Database["public"]["Enums"]["city_enum"]
           created_at?: string | null
           financial_goals?: string[]
           id?: string
@@ -188,6 +188,18 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      city_enum:
+        | "Mumbai"
+        | "Delhi"
+        | "Hyderabad"
+        | "Bangalore"
+        | "Lucknow"
+        | "Other"
+        | "Chennai"
+        | "Kolkata"
+        | "Pune"
+        | "Ahmedabad"
+        | "Jaipur"
       expense_frequency_enum: "Monthly" | "Quarterly" | "Yearly" | "One-time"
       expense_type_enum:
         | "EMI"
@@ -346,6 +358,19 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      city_enum: [
+        "Mumbai",
+        "Delhi",
+        "Hyderabad",
+        "Bangalore",
+        "Lucknow",
+        "Other",
+        "Chennai",
+        "Kolkata",
+        "Pune",
+        "Ahmedabad",
+        "Jaipur",
+      ],
       expense_frequency_enum: ["Monthly", "Quarterly", "Yearly", "One-time"],
       expense_type_enum: [
         "EMI",
