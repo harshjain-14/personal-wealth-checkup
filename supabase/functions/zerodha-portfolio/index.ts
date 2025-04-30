@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.1.0";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
+const KITE_API_KEY = Deno.env.get("KITE_API_KEY") || "";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,6 +18,20 @@ serve(async (req) => {
   }
 
   try {
+    // Verify environment variables are set
+    if (!KITE_API_KEY) {
+      console.error("Missing environment variable: KITE_API_KEY");
+      return new Response(
+        JSON.stringify({
+          error: "Server configuration error. KITE_API_KEY is not set."
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
     // Get the authentication header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
@@ -81,6 +96,11 @@ serve(async (req) => {
       "X-Kite-Version": "3"
     };
 
+    console.log("Fetching Zerodha portfolio with headers:", {
+      authFormat: `token ${KITE_API_KEY}:[access_token]`,
+      kiteVersion: "3"
+    });
+
     // Fetch holdings and positions in parallel
     const [holdingsResponse, positionsResponse] = await Promise.all([
       fetch("https://api.kite.trade/portfolio/holdings", { 
@@ -94,6 +114,10 @@ serve(async (req) => {
     // Parse the responses
     const holdingsData = await holdingsResponse.json();
     const positionsData = await positionsResponse.json();
+
+    // Debug logs
+    console.log("Holdings response status:", holdingsResponse.status);
+    console.log("Positions response status:", positionsResponse.status);
 
     // Check if the requests were successful
     if (!holdingsResponse.ok) {

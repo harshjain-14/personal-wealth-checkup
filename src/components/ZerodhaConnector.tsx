@@ -14,6 +14,7 @@ interface ZerodhaConnectorProps {
 
 const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   // Handler for message from popup
   const handleMessage = useCallback(async (event: MessageEvent) => {
@@ -21,18 +22,24 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
     
     if (event.data.requestToken) {
       setIsLoading(true);
+      setError(null);
       try {
+        console.log("Received request token from popup:", event.data.requestToken);
         // Exchange request token for access token
         const success = await PortfolioService.exchangeZerodhaToken(event.data.requestToken);
         if (success) {
           toast.success('Connected to Zerodha successfully');
           onConnect();
         } else {
-          toast.error('Failed to connect to Zerodha');
+          const errorMessage = 'Failed to connect to Zerodha. Please try again.';
+          setError(errorMessage);
+          toast.error(errorMessage);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Zerodha token exchange error:', error);
-        toast.error('Failed to connect to Zerodha');
+        const errorMessage = error.message || 'Failed to connect to Zerodha';
+        setError(errorMessage);
+        toast.error(errorMessage);
       } finally {
         setIsLoading(false);
       }
@@ -47,6 +54,7 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
 
   const handleConnectZerodha = () => {
     setIsLoading(true);
+    setError(null);
     
     try {
       // Open Zerodha login popup
@@ -58,10 +66,14 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
       // We'll use the login URL from Supabase function to avoid exposing API key in frontend
       PortfolioService.getZerodhaLoginUrl().then(url => {
         if (!url) {
-          toast.error('Failed to generate Zerodha login URL');
+          const errorMessage = 'Failed to generate Zerodha login URL';
+          setError(errorMessage);
+          toast.error(errorMessage);
           setIsLoading(false);
           return;
         }
+        
+        console.log("Opening Zerodha login with URL:", url);
         
         const popup = window.open(
           url,
@@ -71,17 +83,23 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
         
         // Check if popup was blocked
         if (!popup || popup.closed) {
-          toast.error('Popup was blocked. Please allow popups for this site.');
+          const errorMessage = 'Popup was blocked. Please allow popups for this site.';
+          setError(errorMessage);
+          toast.error(errorMessage);
           setIsLoading(false);
         }
       }).catch(error => {
         console.error('Error getting Zerodha login URL:', error);
-        toast.error('Failed to connect to Zerodha');
+        const errorMessage = 'Failed to connect to Zerodha';
+        setError(errorMessage);
+        toast.error(errorMessage);
         setIsLoading(false);
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Zerodha connection error:', error);
-      toast.error('Failed to connect to Zerodha');
+      const errorMessage = error.message || 'Failed to connect to Zerodha';
+      setError(errorMessage);
+      toast.error(errorMessage);
       setIsLoading(false);
     }
   };
@@ -101,6 +119,12 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
           <p className="text-center text-gray-500 mb-6">
             Connect your Zerodha account to import your portfolio holdings and analyze your investments securely.
           </p>
+          
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6 text-sm">
+              {error}
+            </div>
+          )}
         </CardContent>
         <CardFooter>
           <Button 

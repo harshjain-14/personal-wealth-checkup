@@ -187,6 +187,8 @@ const PortfolioService = {
   // Get Zerodha portfolio
   getZerodhaPortfolio: async (): Promise<{ stocks: Stock[]; mutualFunds: MutualFund[] }> => {
     try {
+      console.log("Fetching Zerodha portfolio data...");
+      
       // Call the Zerodha portfolio API via Supabase Edge Function
       const { data, error } = await supabase.functions.invoke('zerodha-portfolio', {});
       
@@ -195,22 +197,21 @@ const PortfolioService = {
         throw error;
       }
       
+      console.log("Zerodha API response:", data);
+      
       if (!data || !data.holdings) {
         console.error('No data returned from Zerodha API');
-        // Return mock data as fallback
-        return {
-          stocks: mockStocks,
-          mutualFunds: mockMutualFunds
-        };
+        throw new Error('No data returned from Zerodha API');
       }
       
       // Process the holdings data from Zerodha
       const stocks: Stock[] = [];
+      const mutualFunds: MutualFund[] = [];
       
       // Convert Zerodha holdings to our Stock type
       if (Array.isArray(data.holdings)) {
         data.holdings.forEach((holding: any) => {
-          // Only include equity type holdings
+          // Check if it's a mutual fund or stock
           if (holding.type === 'EQ') {
             stocks.push({
               symbol: holding.tradingsymbol,
@@ -218,24 +219,30 @@ const PortfolioService = {
               quantity: holding.quantity,
               averagePrice: holding.average_price,
               currentPrice: holding.last_price,
-              sector: 'Unknown' // Zerodha API doesn't provide sector information
+              sector: holding.sector || 'N/A' // Use sector if available, otherwise N/A
+            });
+          } else if (holding.type === 'MF') {
+            mutualFunds.push({
+              name: holding.tradingsymbol,
+              investedAmount: holding.average_price * holding.quantity,
+              currentValue: holding.last_price * holding.quantity,
+              category: 'Mutual Fund' // Zerodha API doesn't provide category, so we use a default
             });
           }
         });
       }
       
-      // For mutual funds, we'll still use mock data since Zerodha API doesn't separate them clearly
+      console.log(`Processed ${stocks.length} stocks and ${mutualFunds.length} mutual funds`);
+      
       return {
         stocks,
-        mutualFunds: [...mockMutualFunds]
+        mutualFunds
       };
     } catch (error) {
       console.error('Error in getZerodhaPortfolio:', error);
-      // Return mock data as fallback
-      return {
-        stocks: [...mockStocks],
-        mutualFunds: [...mockMutualFunds]
-      };
+      // If we encounter an error, we'll throw it instead of returning mock data
+      // This will allow us to show appropriate error messages to the user
+      throw error;
     }
   },
   
@@ -702,8 +709,34 @@ const PortfolioService = {
       const futureExpenses = await PortfolioService.getFutureExpenses();
       const userInfo = await PortfolioService.getUserInfo();
       
-      // Get Zerodha portfolio data
-      const { stocks, mutualFunds } = await PortfolioService.getZerodhaPortfolio();
+      // Check if user is connected to Zerodha
+      const { data: { user } } = await supabase.auth.getUser();
+      let stocks: Stock[] = [];
+      let mutualFunds: MutualFund[] = [];
+      
+      if (user) {
+        // Check if the user has Zerodha credentials
+        const { data: credentials, error } = await supabase
+          .from('zerodha_credentials')
+          .select('access_token')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (!error && credentials?.access_token) {
+          // User has Zerodha connected, fetch real data
+          try {
+            const zerodhaData = await PortfolioService.getZerodhaPortfolio();
+            stocks = zerodhaData.stocks;
+            mutualFunds = zerodhaData.mutualFunds;
+          } catch (zerodhaError) {
+            console.error('Error fetching Zerodha portfolio:', zerodhaError);
+            // If there's an error fetching Zerodha data, we'll show an empty portfolio
+            // This will prompt the user to reconnect their Zerodha account
+          }
+        } else {
+          console.log('User not connected to Zerodha or missing access token');
+        }
+      }
       
       return {
         stocks,
