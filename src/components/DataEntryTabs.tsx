@@ -1,6 +1,7 @@
+
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardDescription, CardFooter, CardTitle } from '@/components/ui/card';
 import ZerodhaConnector from './ZerodhaConnector';
 import ExternalInvestmentsForm from './ExternalInvestmentsForm';
 import ExpensesForm from './ExpensesForm';
@@ -8,9 +9,10 @@ import FutureExpensesForm from './FutureExpensesForm';
 import UserInfoForm from './UserInfoForm';
 import { Button } from '@/components/ui/button';
 import SeedDataButton from './SeedDataButton';
-import PortfolioService, { PortfolioData, ExternalInvestment, Expense, FutureExpense, UserInfo } from '@/services/portfolio-service';
+import PortfolioService, { PortfolioData, ExternalInvestment, Expense, FutureExpense, UserInfo, Stock, MutualFund } from '@/services/portfolio-service';
 import AnalysisService from '@/services/analysis-service';
 import { toast } from 'sonner';
+import { Loader2 } from 'lucide-react';
 
 interface DataEntryTabsProps {
   portfolioData: PortfolioData;
