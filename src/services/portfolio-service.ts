@@ -1,3 +1,4 @@
+
 // Updated Portfolio service to use Supabase
 
 import { supabase } from "@/integrations/supabase/client";
@@ -23,6 +24,7 @@ export interface MutualFund {
 
 // Type that matches the database schema
 type InvestmentType = Database["public"]["Enums"]["investment_type"];
+type CityEnum = Database["public"]["Enums"]["city_enum"];
 
 export interface ExternalInvestment {
   type: string;
@@ -169,6 +171,16 @@ const mapExpenseTypeToEnum = (type: string): ExpenseType => {
   if (type === 'Utility Bills') return 'Utility Bills';
   if (type === 'Medical') return 'Medical';
   return 'Others'; // Default fallback
+};
+
+// Map city to database enum to ensure it matches Supabase enum values
+const mapCityToEnum = (city: string): CityEnum => {
+  // Check if the city is already one of the valid enum values
+  if (["Mumbai", "Delhi", "Hyderabad", "Bangalore", "Lucknow", "Other", 
+       "Chennai", "Kolkata", "Pune", "Ahmedabad", "Jaipur"].includes(city)) {
+    return city as CityEnum;
+  }
+  return 'Other'; // Default fallback if it doesn't match any valid option
 };
 
 // Portfolio service using Supabase
@@ -529,9 +541,13 @@ const PortfolioService = {
         riskToleranceValue = "high - growth focused";
       }
       
+      // Ensure city is a valid enum value from the database
+      const cityValue = mapCityToEnum(userInfo.city);
+      
       console.log("DEBUG - Saving user info:", {
         userInfo,
         mappedRiskTolerance: riskToleranceValue,
+        mappedCity: cityValue,
         financialGoals: userInfo.financialGoals
       });
       
@@ -539,7 +555,7 @@ const PortfolioService = {
         id: user.id, // Use user.id as the primary key
         user_id: user.id,
         age: userInfo.age,
-        city: userInfo.city,
+        city: cityValue,
         risk_tolerance: riskToleranceValue,
         financial_goals: userInfo.financialGoals || []
       };

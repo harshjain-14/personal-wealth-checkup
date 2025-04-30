@@ -13,14 +13,16 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { UserInfo } from '@/services/portfolio-service';
+import { Database } from '@/integrations/supabase/types';
 
 interface UserInfoFormProps {
   userInfo?: UserInfo;
   onSave: (userInfo: UserInfo) => void;
 }
 
-// Indian major cities
-const MAJOR_CITIES = [
+// Indian major cities using the exact values from the database enum
+type CityEnum = Database["public"]["Enums"]["city_enum"];
+const MAJOR_CITIES: CityEnum[] = [
   'Mumbai',
   'Delhi',
   'Bangalore',
@@ -55,7 +57,7 @@ const FINANCIAL_GOALS = [
 const UserInfoForm = ({ userInfo, onSave }: UserInfoFormProps) => {
   const [formData, setFormData] = useState<UserInfo>({
     age: userInfo?.age || 0,
-    city: userInfo?.city || '',
+    city: (userInfo?.city as CityEnum) || 'Mumbai',
     riskTolerance: userInfo?.riskTolerance || 'medium',
     financialGoals: userInfo?.financialGoals || []
   });
@@ -64,7 +66,10 @@ const UserInfoForm = ({ userInfo, onSave }: UserInfoFormProps) => {
   
   useEffect(() => {
     if (userInfo) {
-      setFormData(userInfo);
+      setFormData({
+        ...userInfo,
+        city: userInfo.city as CityEnum
+      });
       setSelectedGoals(userInfo.financialGoals || []);
     }
   }, [userInfo]);
@@ -88,7 +93,7 @@ const UserInfoForm = ({ userInfo, onSave }: UserInfoFormProps) => {
       return;
     }
 
-    const finalCity = formData.city === 'Other' ? otherCity : formData.city;
+    const finalCity = formData.city === 'Other' && otherCity ? otherCity as CityEnum : formData.city;
     
     console.log("DEBUG - Submitting user info with financial goals:", selectedGoals);
     
@@ -131,7 +136,7 @@ const UserInfoForm = ({ userInfo, onSave }: UserInfoFormProps) => {
               <Label htmlFor="city">City</Label>
               <Select 
                 value={formData.city} 
-                onValueChange={(value) => setFormData({...formData, city: value})}
+                onValueChange={(value: CityEnum) => setFormData({...formData, city: value})}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select city" />

@@ -1,4 +1,5 @@
 
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.42.6";
 
@@ -179,11 +180,12 @@ serve(async (req) => {
     }
     
     // Seed personal info - Making sure financial_goals is an array and risk_tolerance matches enum
+    // Ensure we're using a valid city enum value from the database
     const personalInfo = {
       id: userId,
       user_id: userId,
       age: 35,
-      city: "Mumbai",
+      city: "Mumbai", // This must be one of the valid enum values
       risk_tolerance: "medium - balanced apporach", // Ensure exact match with enum value in database
       financial_goals: ["Retirement", "Children's Education", "Wealth Creation", "Travel"] // Properly passed as an array
     };
