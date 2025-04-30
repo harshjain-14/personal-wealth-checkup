@@ -206,12 +206,27 @@ const PortfolioService = {
       
       // Process the holdings data from Zerodha
       const stocks: Stock[] = [];
-      const mutualFunds: MutualFund[] = [];
       
-      // TODO: Process the data based on actual Zerodha API response format
-      // For now, returning mock data
+      // Convert Zerodha holdings to our Stock type
+      if (Array.isArray(data.holdings)) {
+        data.holdings.forEach((holding: any) => {
+          // Only include equity type holdings
+          if (holding.type === 'EQ') {
+            stocks.push({
+              symbol: holding.tradingsymbol,
+              name: holding.tradingsymbol,
+              quantity: holding.quantity,
+              averagePrice: holding.average_price,
+              currentPrice: holding.last_price,
+              sector: 'Unknown' // Zerodha API doesn't provide sector information
+            });
+          }
+        });
+      }
+      
+      // For mutual funds, we'll still use mock data since Zerodha API doesn't separate them clearly
       return {
-        stocks: [...mockStocks],
+        stocks,
         mutualFunds: [...mockMutualFunds]
       };
     } catch (error) {

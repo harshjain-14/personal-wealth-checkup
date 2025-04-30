@@ -1,9 +1,12 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createHash } from "https://deno.land/std@0.168.0/crypto/mod.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.1.0";
 
 const KITE_API_KEY = Deno.env.get("KITE_API_KEY") || "";
 const KITE_API_SECRET = Deno.env.get("KITE_API_SECRET") || "";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -65,14 +68,14 @@ serve(async (req) => {
     const response = await fetch("https://api.kite.trade/session/token", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/x-www-form-urlencoded",
         "X-Kite-Version": "3"
       },
-      body: JSON.stringify({
+      body: new URLSearchParams({
         api_key: KITE_API_KEY,
         request_token: request_token,
         checksum: checksum
-      })
+      }).toString()
     });
 
     const data = await response.json();
@@ -123,19 +126,20 @@ serve(async (req) => {
       );
     }
 
-    // Store the access token in zerodha_credentials table
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    // Create Supabase client with the auth header
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: {
+        headers: {
+          Authorization: authHeader
+        }
+      }
+    });
 
     // Get the user ID
-    const {
-      data: { user },
-    } = await supabaseClient.auth.getUser();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
 
-    if (!user) {
+    if (userError || !user) {
+      console.error("Error getting user:", userError);
       return new Response(
         JSON.stringify({
           success: false,
@@ -149,7 +153,7 @@ serve(async (req) => {
     }
 
     // Store access token in zerodha_credentials table
-    const { error } = await supabaseClient
+    const { error: upsertError } = await supabase
       .from('zerodha_credentials')
       .upsert([
         { 
@@ -159,8 +163,8 @@ serve(async (req) => {
         }
       ]);
 
-    if (error) {
-      console.error("Error storing access token:", error);
+    if (upsertError) {
+      console.error("Error storing access token:", upsertError);
       return new Response(
         JSON.stringify({
           success: false,
@@ -196,26 +200,3 @@ serve(async (req) => {
     );
   }
 });
-
-// Helper function to create Supabase client
-function createClient(
-  supabaseUrl: string,
-  supabaseKey: string,
-  options: any
-) {
-  return {
-    from: (table: string) => ({
-      upsert: (values: any) => {
-        console.log(`Mock upsert to ${table}:`, values);
-        return Promise.resolve({ error: null });
-      }
-    }),
-    auth: {
-      getUser: () => {
-        return Promise.resolve({
-          data: { user: { id: 'mock-user-id' } }
-        });
-      }
-    }
-  };
-}

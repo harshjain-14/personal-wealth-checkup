@@ -1,5 +1,9 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.1.0";
+
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -27,19 +31,19 @@ serve(async (req) => {
       );
     }
 
-    // Get the user from Supabase Auth
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    // Create Supabase client with the auth header
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: {
+        headers: {
+          Authorization: authHeader
+        }
+      }
+    });
 
     // Get the user ID
-    const {
-      data: { user },
-    } = await supabaseClient.auth.getUser();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
 
-    if (!user) {
+    if (userError || !user) {
       return new Response(
         JSON.stringify({
           error: "User authentication failed"
@@ -52,7 +56,7 @@ serve(async (req) => {
     }
 
     // Get the access token from zerodha_credentials table
-    const { data: credentials, error: credentialsError } = await supabaseClient
+    const { data: credentials, error: credentialsError } = await supabase
       .from('zerodha_credentials')
       .select('access_token')
       .eq('user_id', user.id)
@@ -73,7 +77,7 @@ serve(async (req) => {
     // Fetch portfolio data from Zerodha API
     const access_token = credentials.access_token;
     const headers = { 
-      "Authorization": `token ${access_token}`,
+      "Authorization": `token ${KITE_API_KEY}:${access_token}`,
       "X-Kite-Version": "3"
     };
 
@@ -141,33 +145,3 @@ serve(async (req) => {
     );
   }
 });
-
-// Helper function to create Supabase client
-function createClient(
-  supabaseUrl: string,
-  supabaseKey: string,
-  options: any
-) {
-  return {
-    from: (table: string) => ({
-      select: (columns: string) => ({
-        eq: (column: string, value: any) => ({
-          single: () => {
-            console.log(`Mock query: SELECT ${columns} FROM ${table} WHERE ${column} = ${value}`);
-            return Promise.resolve({
-              data: { access_token: 'mock-access-token' },
-              error: null
-            });
-          }
-        })
-      })
-    }),
-    auth: {
-      getUser: () => {
-        return Promise.resolve({
-          data: { user: { id: 'mock-user-id' } }
-        });
-      }
-    }
-  };
-}
