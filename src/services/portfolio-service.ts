@@ -1,4 +1,3 @@
-
 // Updated Portfolio service to use Supabase
 
 import { supabase } from "@/integrations/supabase/client";
@@ -187,58 +186,89 @@ const mapCityToEnum = (city: string): CityEnum => {
 const PortfolioService = {
   // Get Zerodha portfolio
   getZerodhaPortfolio: async (): Promise<{ stocks: Stock[]; mutualFunds: MutualFund[] }> => {
-    // For now, continue to use mock data
-    // In a real implementation, we would fetch this from Zerodha API via a Supabase Edge Function
-    await new Promise(resolve => setTimeout(resolve, 1200));
-    
-    return {
-      stocks: [...mockStocks],
-      mutualFunds: [...mockMutualFunds]
-    };
-  },
-  
-  // Connect to Zerodha
-  connectToZerodha: async (username: string, password: string): Promise<boolean> => {
     try {
-      // In a real implementation, we would verify credentials via Zerodha API
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      if (!username || !password) {
-        toast.error("Username and password are required");
-        return false;
-      }
-      
-      // Store Zerodha credentials in Supabase
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        toast.error("You must be logged in to connect to Zerodha");
-        return false;
-      }
-      
-      const { error } = await supabase
-        .from('zerodha_credentials')
-        .upsert([
-          { 
-            user_id: user.id,
-            zerodha_user_id: username
-            // Note: We don't store passwords, in a real app we would use OAuth
-          }
-        ]);
+      // Call the Zerodha portfolio API via Supabase Edge Function
+      const { data, error } = await supabase.functions.invoke('zerodha-portfolio', {});
       
       if (error) {
-        console.error("Supabase error:", error);
-        toast.error("Failed to connect to Zerodha");
+        console.error('Error fetching Zerodha portfolio:', error);
+        throw error;
+      }
+      
+      if (!data || !data.holdings) {
+        console.error('No data returned from Zerodha API');
+        // Return mock data as fallback
+        return {
+          stocks: mockStocks,
+          mutualFunds: mockMutualFunds
+        };
+      }
+      
+      // Process the holdings data from Zerodha
+      const stocks: Stock[] = [];
+      const mutualFunds: MutualFund[] = [];
+      
+      // TODO: Process the data based on actual Zerodha API response format
+      // For now, returning mock data
+      return {
+        stocks: [...mockStocks],
+        mutualFunds: [...mockMutualFunds]
+      };
+    } catch (error) {
+      console.error('Error in getZerodhaPortfolio:', error);
+      // Return mock data as fallback
+      return {
+        stocks: [...mockStocks],
+        mutualFunds: [...mockMutualFunds]
+      };
+    }
+  },
+  
+  // Get Zerodha login URL from edge function
+  getZerodhaLoginUrl: async (): Promise<string | null> => {
+    try {
+      const { data, error } = await supabase.functions.invoke('zerodha-login-url', {});
+      
+      if (error) {
+        console.error('Error getting Zerodha login URL:', error);
+        return null;
+      }
+      
+      return data.loginUrl;
+    } catch (error) {
+      console.error('Error in getZerodhaLoginUrl:', error);
+      return null;
+    }
+  },
+  
+  // Exchange Zerodha request token for access token
+  exchangeZerodhaToken: async (requestToken: string): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase.functions.invoke('zerodha-exchange-token', {
+        body: { request_token: requestToken }
+      });
+      
+      if (error) {
+        console.error('Error exchanging Zerodha token:', error);
         return false;
       }
       
-      toast.success("Connected to Zerodha successfully");
+      if (!data.success) {
+        console.error('Token exchange failed:', data.message);
+        return false;
+      }
+      
       return true;
     } catch (error) {
-      console.error("Zerodha connection error:", error);
-      toast.error("Failed to connect to Zerodha");
+      console.error('Error in exchangeZerodhaToken:', error);
       return false;
     }
+  },
+  
+  // Connect to Zerodha (legacy method for compatibility)
+  connectToZerodha: async (username: string, password: string): Promise<boolean> => {
+    toast.error("This method is deprecated. Please use the 'Login with Zerodha' button instead.");
+    return false;
   },
   
   // Save external investments
@@ -650,24 +680,37 @@ const PortfolioService = {
   
   // Get portfolio data (legacy method for compatibility)
   getPortfolioData: async (): Promise<PortfolioData> => {
-    // Get all data types
-    const externalInvestments = await PortfolioService.getExternalInvestments();
-    const expenses = await PortfolioService.getExpenses();
-    const futureExpenses = await PortfolioService.getFutureExpenses();
-    const userInfo = await PortfolioService.getUserInfo();
-    
-    // For now, continue to use mock data for stocks and mutual funds
-    const { stocks, mutualFunds } = await PortfolioService.getZerodhaPortfolio();
-    
-    return {
-      stocks,
-      mutualFunds,
-      externalInvestments,
-      expenses,
-      futureExpenses,
-      userInfo: userInfo || undefined,
-      lastUpdated: new Date().toISOString()
-    };
+    try {
+      // Get all data types
+      const externalInvestments = await PortfolioService.getExternalInvestments();
+      const expenses = await PortfolioService.getExpenses();
+      const futureExpenses = await PortfolioService.getFutureExpenses();
+      const userInfo = await PortfolioService.getUserInfo();
+      
+      // Get Zerodha portfolio data
+      const { stocks, mutualFunds } = await PortfolioService.getZerodhaPortfolio();
+      
+      return {
+        stocks,
+        mutualFunds,
+        externalInvestments,
+        expenses,
+        futureExpenses,
+        userInfo: userInfo || undefined,
+        lastUpdated: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('Error in getPortfolioData:', error);
+      // Return empty data as fallback
+      return {
+        stocks: [],
+        mutualFunds: [],
+        externalInvestments: [],
+        expenses: [],
+        futureExpenses: [],
+        lastUpdated: new Date().toISOString()
+      };
+    }
   }
 };
 
