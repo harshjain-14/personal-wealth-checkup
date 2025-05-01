@@ -130,22 +130,6 @@ export interface PortfolioData {
   lastUpdated: string;
 }
 
-// Mock data for demo purposes
-const mockStocks: Stock[] = [
-  { symbol: "RELIANCE", name: "Reliance Industries", quantity: 10, averagePrice: 2400, currentPrice: 2580, sector: "Energy" },
-  { symbol: "INFY", name: "Infosys", quantity: 25, averagePrice: 1450, currentPrice: 1520, sector: "IT" },
-  { symbol: "HDFCBANK", name: "HDFC Bank", quantity: 15, averagePrice: 1600, currentPrice: 1550, sector: "Finance" },
-  { symbol: "TCS", name: "Tata Consultancy Services", quantity: 8, averagePrice: 3200, currentPrice: 3350, sector: "IT" },
-  { symbol: "ICICIBANK", name: "ICICI Bank", quantity: 30, averagePrice: 700, currentPrice: 750, sector: "Finance" },
-  { symbol: "ITC", name: "ITC Limited", quantity: 50, averagePrice: 350, currentPrice: 380, sector: "Consumer Goods" },
-];
-
-const mockMutualFunds: MutualFund[] = [
-  { name: "HDFC Mid-Cap Opportunities Fund", investedAmount: 50000, currentValue: 58000, category: "Mid Cap" },
-  { name: "Axis Bluechip Fund", investedAmount: 75000, currentValue: 82000, category: "Large Cap" },
-  { name: "SBI Small Cap Fund", investedAmount: 40000, currentValue: 46000, category: "Small Cap" },
-];
-
 // Map investment type string to database enum
 const mapInvestmentTypeToEnum = (type: string): InvestmentType => {
   // Direct mapping based on the exact enum values from the screenshot
@@ -217,10 +201,18 @@ const PortfolioService = {
         toast.error('No data returned from Zerodha API');
         throw new Error('No data returned from Zerodha API');
       }
-      
-      // Process the holdings data from Zerodha
+
+      // Process the portfolio data
       const stocks: Stock[] = [];
       const mutualFunds: MutualFund[] = [];
+      
+      // Save portfolio data to database for persistence
+      try {
+        await PortfolioService.savePortfolioToDb(data);
+      } catch (saveError) {
+        console.error('Error saving portfolio to database:', saveError);
+        // Continue with processing even if save fails
+      }
       
       // Convert Zerodha holdings to our Stock type
       if (Array.isArray(data.holdings)) {
@@ -257,6 +249,40 @@ const PortfolioService = {
       throw error;
     }
   },
+
+  // Save portfolio data to database for persistence
+  savePortfolioToDb: async (portfolioData: any): Promise<boolean> => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.error('User not authenticated');
+        return false;
+      }
+
+      const userId = session.user.id;
+      const now = new Date().toISOString();
+      
+      // Store the raw portfolio data as JSON
+      const { error } = await supabase
+        .from('portfolio_snapshots')
+        .insert({
+          user_id: userId,
+          snapshot_data: portfolioData,
+          snapshot_date: now
+        })
+        .select();
+
+      if (error) {
+        console.error('Error saving portfolio snapshot:', error);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error saving portfolio to database:', error);
+      return false;
+    }
+  },
   
   // Get Zerodha login URL from edge function
   getZerodhaLoginUrl: async (): Promise<string | null> => {
@@ -282,6 +308,49 @@ const PortfolioService = {
       console.error('Error in getZerodhaLoginUrl:', error);
       toast.error(`Error in getZerodhaLoginUrl: ${error.message || 'Unknown error'}`);
       return null;
+    }
+  },
+  
+  // Logout from Zerodha by invalidating the access token
+  logoutFromZerodha: async (): Promise<boolean> => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.error('User not authenticated');
+        toast.error('You must be logged in to disconnect from Zerodha');
+        return false;
+      }
+
+      // Call edge function to invalidate the token
+      const { data, error } = await supabase.functions.invoke('zerodha-logout', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
+      });
+
+      if (error) {
+        console.error('Error logging out from Zerodha:', error);
+        toast.error(`Logout failed: ${error.message}`);
+        return false;
+      }
+
+      // Also remove token from our database
+      const { error: dbError } = await supabase
+        .from('zerodha_credentials')
+        .update({ access_token: null })
+        .eq('user_id', session.user.id);
+
+      if (dbError) {
+        console.error('Error removing token from database:', dbError);
+        // We still consider this a success since the Zerodha token was invalidated
+      }
+
+      return true;
+    } catch (error: any) {
+      console.error('Error in logoutFromZerodha:', error);
+      toast.error(`Error disconnecting: ${error.message || 'Unknown error'}`);
+      return false;
     }
   },
   

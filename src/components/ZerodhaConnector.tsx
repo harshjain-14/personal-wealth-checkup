@@ -2,12 +2,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Loader2, AlertCircle, RefreshCw, LogOut } from 'lucide-react';
 import TrustMessage from './TrustMessage';
 import PortfolioService from '@/services/portfolio-service';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from '@/components/ui/badge';
 
 interface ZerodhaConnectorProps {
   onConnect: () => void;
@@ -15,8 +16,28 @@ interface ZerodhaConnectorProps {
 
 const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
   const [isLoading, setIsLoading] = useState(false);
+  const [isLogoutLoading, setIsLogoutLoading] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
+  
+  useEffect(() => {
+    // Check if user is already connected to Zerodha on component mount
+    const checkConnection = async () => {
+      try {
+        const { data } = await supabase
+          .from('zerodha_credentials')
+          .select('access_token')
+          .maybeSingle();
+          
+        setIsConnected(!!data?.access_token);
+      } catch (error) {
+        console.error('Error checking Zerodha connection:', error);
+      }
+    };
+    
+    checkConnection();
+  }, []);
   
   // Handler for message from popup
   const handleMessage = useCallback(async (event: MessageEvent) => {
@@ -37,6 +58,7 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
         
         if (success) {
           toast.success('Connected to Zerodha successfully');
+          setIsConnected(true);
           onConnect();
         } else {
           const errorMessage = 'Failed to connect to Zerodha. Please try again.';
@@ -125,6 +147,24 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
     }
   };
 
+  const handleLogoutZerodha = async () => {
+    setIsLogoutLoading(true);
+    try {
+      const success = await PortfolioService.logoutFromZerodha();
+      if (success) {
+        toast.success('Disconnected from Zerodha successfully');
+        setIsConnected(false);
+      } else {
+        toast.error('Failed to disconnect from Zerodha');
+      }
+    } catch (error: any) {
+      console.error('Zerodha logout error:', error);
+      toast.error(`Failed to disconnect: ${error.message || 'Unknown error'}`);
+    } finally {
+      setIsLogoutLoading(false);
+    }
+  };
+
   const handleRetry = () => {
     setReconnectAttempts(prev => prev + 1);
     setError(null);
@@ -136,11 +176,18 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
       <TrustMessage />
       
       <Card className="w-full bg-white shadow-sm border-finance-teal/20">
-        <CardHeader>
-          <CardTitle className="text-lg font-medium">Connect Zerodha Account</CardTitle>
-          <CardDescription>
-            Better investing starts with better awareness. Connect your account to get started.
-          </CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <div>
+            <CardTitle className="text-lg font-medium">Connect Zerodha Account</CardTitle>
+            <CardDescription>
+              Better investing starts with better awareness. Connect your account to get started.
+            </CardDescription>
+          </div>
+          {isConnected && (
+            <Badge variant="outline" className="bg-finance-teal/10 text-finance-teal border-finance-teal/30">
+              Connected
+            </Badge>
+          )}
         </CardHeader>
         <CardContent className="flex flex-col items-center justify-center py-8">
           <p className="text-center text-gray-500 mb-6">
@@ -166,21 +213,49 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
             </Alert>
           )}
         </CardContent>
-        <CardFooter>
-          <Button 
-            onClick={handleConnectZerodha}
-            className="w-full bg-finance-teal hover:bg-finance-teal/90"
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Connecting...
-              </>
-            ) : (
-              'Login with Zerodha'
-            )}
-          </Button>
+        <CardFooter className="flex flex-col space-y-3">
+          {isConnected ? (
+            <div className="w-full space-y-3">
+              <Button 
+                onClick={handleLogoutZerodha}
+                className="w-full bg-destructive hover:bg-destructive/90 text-white"
+                disabled={isLogoutLoading}
+              >
+                {isLogoutLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Disconnecting...
+                  </>
+                ) : (
+                  <>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Disconnect Zerodha Account
+                  </>
+                )}
+              </Button>
+              <Button 
+                onClick={onConnect}
+                className="w-full bg-finance-blue hover:bg-finance-blue/90"
+              >
+                View Portfolio
+              </Button>
+            </div>
+          ) : (
+            <Button 
+              onClick={handleConnectZerodha}
+              className="w-full bg-finance-teal hover:bg-finance-teal/90"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Connecting...
+                </>
+              ) : (
+                'Login with Zerodha'
+              )}
+            </Button>
+          )}
         </CardFooter>
       </Card>
     </div>
