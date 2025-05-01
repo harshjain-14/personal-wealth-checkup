@@ -13,7 +13,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Function to create checksum - fixed to use sha-256 instead of SHA256
+// Function to create checksum using SHA-256
 async function generateChecksum(apiKey: string, requestToken: string, apiSecret: string): Promise<string> {
   console.log(`Generating checksum with apiKey: ${apiKey}, requestToken: ${requestToken}, and apiSecret length: ${apiSecret.length}`);
   try {
@@ -21,7 +21,6 @@ async function generateChecksum(apiKey: string, requestToken: string, apiSecret:
     const encoder = new TextEncoder();
     const messageBuffer = encoder.encode(data);
     
-    // Use sha-256 instead of SHA256 - this is the fix for the algorithm error
     const hashBuffer = await crypto.subtle.digest("sha-256", messageBuffer);
     
     const hashArray = Array.from(new Uint8Array(hashBuffer));
@@ -132,10 +131,12 @@ serve(async (req) => {
 
     console.log(`Received access token from Zerodha: ${access_token.substring(0, 5)}...`);
 
-    // Get the user from Supabase Auth
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      console.error("No authorization header present");
+    // Get the auth header and extract token
+    const authHeader = req.headers.get('Authorization') || '';
+    const token = authHeader.replace('Bearer ', '');
+
+    if (!authHeader || !token) {
+      console.error("No authorization header present or token is empty");
       return new Response(
         JSON.stringify({
           success: false,
@@ -148,25 +149,21 @@ serve(async (req) => {
       );
     }
 
-    console.log("Auth header present, creating Supabase client");
-    // Create Supabase client with the auth header
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: {
-        headers: {
-          Authorization: authHeader
-        }
-      }
-    });
+    // Create Supabase admin client with service role key
+    const supabaseAdmin = createClient(
+      SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY
+    );
 
-    // Get the user ID
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    // Get the user from token
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
 
     if (userError || !user) {
       console.error("Error getting user:", userError);
       return new Response(
         JSON.stringify({
           success: false,
-          message: "User authentication failed"
+          message: "User authentication failed: " + (userError?.message || "Unknown error")
         }),
         {
           status: 401,
@@ -178,7 +175,7 @@ serve(async (req) => {
     console.log(`Storing access token for user: ${user.id}`);
 
     // Store access token in zerodha_credentials table
-    const { error: upsertError } = await supabase
+    const { error: upsertError } = await supabaseAdmin
       .from('zerodha_credentials')
       .upsert([
         { 

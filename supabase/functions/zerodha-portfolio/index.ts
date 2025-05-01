@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.1.0";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const KITE_API_KEY = Deno.env.get("KITE_API_KEY") || "";
 
 const corsHeaders = {
@@ -32,9 +33,12 @@ serve(async (req) => {
       );
     }
 
-    // Get the authentication header
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
+    // Get the authorization header and extract the token
+    const authHeader = req.headers.get('Authorization') || '';
+    const token = authHeader.replace('Bearer ', '');
+    
+    if (!authHeader || !token) {
+      console.error("No authorization header present or token is empty");
       return new Response(
         JSON.stringify({
           error: "Authentication required"
@@ -46,23 +50,20 @@ serve(async (req) => {
       );
     }
 
-    // Create Supabase client with the auth header
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: {
-        headers: {
-          Authorization: authHeader
-        }
-      }
-    });
+    // Create Supabase admin client with service role
+    const supabaseAdmin = createClient(
+      SUPABASE_URL, 
+      SUPABASE_SERVICE_ROLE_KEY
+    );
 
-    // Get the user ID
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    // Get the user from token
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
 
     if (userError || !user) {
       console.error("User authentication failed:", userError);
       return new Response(
         JSON.stringify({
-          error: "User authentication failed"
+          error: "User authentication failed: " + (userError?.message || "Unknown error")
         }),
         {
           status: 401,
@@ -74,7 +75,7 @@ serve(async (req) => {
     console.log(`Getting Zerodha credentials for user: ${user.id}`);
     
     // Get the access token from zerodha_credentials table
-    const { data: credentials, error: credentialsError } = await supabase
+    const { data: credentials, error: credentialsError } = await supabaseAdmin
       .from('zerodha_credentials')
       .select('access_token')
       .eq('user_id', user.id)
@@ -131,7 +132,7 @@ serve(async (req) => {
         // If token is invalid, we should clear it and ask user to reconnect
         if (userProfileResponse.status === 403 || userProfileResponse.status === 401) {
           // Clear the invalid token
-          await supabase
+          await supabaseAdmin
             .from('zerodha_credentials')
             .update({ access_token: null })
             .eq('user_id', user.id);
@@ -174,6 +175,10 @@ serve(async (req) => {
       console.log("Positions response status:", positionsResponse.status);
       console.log("Holdings data status:", holdingsData.status);
       console.log("Positions data status:", positionsData.status);
+      
+      // Log full responses for debugging
+      console.log("Holdings data:", JSON.stringify(holdingsData).substring(0, 200) + "...");
+      console.log("Positions data:", JSON.stringify(positionsData).substring(0, 200) + "...");
 
       // Check if the requests were successful
       if (!holdingsResponse.ok) {

@@ -71,7 +71,7 @@ type PurposeType = Database["public"]["Enums"]["future_expense_enumm"];
 type TimeframeType = Database["public"]["Enums"]["timeframe_enum"];
 type PriorityType = Database["public"]["Enums"]["priority_enum"];
 
-// Map frontend purpose to database enum - FIXED to match exact database values from the screenshot
+// Map frontend purpose to database enum
 const mapPurposeToEnum = (purpose: string): PurposeType => {
   // Using a direct mapping approach to ensure exact matches with the database enum
   if (purpose === 'House Purchase') return 'House Purchase';
@@ -189,9 +189,19 @@ const PortfolioService = {
     try {
       console.log("Fetching Zerodha portfolio data...");
       
-      // Call the Zerodha portfolio API via Supabase Edge Function
+      // Get the current user session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.error('User not authenticated');
+        throw new Error('User not authenticated');
+      }
+      
+      // Call the Zerodha portfolio API via Supabase Edge Function with auth token
       const { data, error } = await supabase.functions.invoke('zerodha-portfolio', {
-        method: 'GET'
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
       });
       
       if (error) {
@@ -278,10 +288,22 @@ const PortfolioService = {
   // Exchange Zerodha request token for access token
   exchangeZerodhaToken: async (requestToken: string): Promise<boolean> => {
     try {
-      console.log(`Exchanging Zerodha token: ${requestToken}`);
+      console.log(`Exchanging Zerodha token: ${requestToken.substring(0, 5)}...`);
       
+      // Get current session for auth token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.error('User not authenticated');
+        toast.error('You must be logged in to connect to Zerodha');
+        return false;
+      }
+      
+      // Call the edge function with auth token
       const { data, error } = await supabase.functions.invoke('zerodha-exchange-token', {
         method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        },
         body: { request_token: requestToken }
       });
       
@@ -730,17 +752,17 @@ const PortfolioService = {
       const userInfo = await PortfolioService.getUserInfo();
       
       // Check if user is connected to Zerodha
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
       let stocks: Stock[] = [];
       let mutualFunds: MutualFund[] = [];
       
-      if (user) {
+      if (session?.user) {
         try {
           // Check if the user has Zerodha credentials
           const { data: credentials, error } = await supabase
             .from('zerodha_credentials')
             .select('access_token')
-            .eq('user_id', user.id)
+            .eq('user_id', session.user.id)
             .maybeSingle();
           
           console.log('Zerodha credentials check:', { 

@@ -51,6 +51,12 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
       } finally {
         setIsLoading(false);
       }
+    } else if (event.data.error) {
+      // Handle error from the popup
+      console.error('Error received from Zerodha popup:', event.data.error);
+      setError(`Zerodha login error: ${event.data.error}`);
+      setIsLoading(false);
+      toast.error(`Zerodha login error: ${event.data.error}`);
     }
   }, [onConnect]);
 
