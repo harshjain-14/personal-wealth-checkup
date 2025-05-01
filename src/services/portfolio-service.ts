@@ -287,17 +287,22 @@ const PortfolioService = {
       
       if (error) {
         console.error('Error exchanging Zerodha token:', error);
+        toast.error(`Token exchange error: ${error.message || 'Unknown error'}`);
         return false;
       }
       
-      if (!data.success) {
-        console.error('Token exchange failed:', data.message);
+      console.log('Token exchange response:', data);
+      
+      if (!data || !data.success) {
+        console.error('Token exchange failed:', data?.message || 'Unknown reason');
+        toast.error(`Token exchange failed: ${data?.message || 'Unknown reason'}`);
         return false;
       }
       
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in exchangeZerodhaToken:', error);
+      toast.error(`Error exchanging token: ${error.message || 'Unknown error'}`);
       return false;
     }
   },
@@ -730,27 +735,39 @@ const PortfolioService = {
       let mutualFunds: MutualFund[] = [];
       
       if (user) {
-        // Check if the user has Zerodha credentials
-        const { data: credentials, error } = await supabase
-          .from('zerodha_credentials')
-          .select('access_token')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        
-        if (!error && credentials?.access_token) {
-          // User has Zerodha connected, fetch real data
-          try {
-            const zerodhaData = await PortfolioService.getZerodhaPortfolio();
-            stocks = zerodhaData.stocks;
-            mutualFunds = zerodhaData.mutualFunds;
-          } catch (zerodhaError) {
-            console.error('Error fetching Zerodha portfolio:', zerodhaError);
-            toast.error('Failed to fetch Zerodha portfolio. Please reconnect your account.');
-            // If there's an error fetching Zerodha data, we'll show an empty portfolio
-            // This will prompt the user to reconnect their Zerodha account
+        try {
+          // Check if the user has Zerodha credentials
+          const { data: credentials, error } = await supabase
+            .from('zerodha_credentials')
+            .select('access_token')
+            .eq('user_id', user.id)
+            .maybeSingle();
+          
+          console.log('Zerodha credentials check:', { 
+            hasCredentials: !!credentials, 
+            hasToken: !!credentials?.access_token,
+            error: error ? error.message : null 
+          });
+          
+          if (!error && credentials?.access_token) {
+            // User has Zerodha connected, fetch real data
+            try {
+              console.log('Fetching Zerodha portfolio...');
+              const zerodhaData = await PortfolioService.getZerodhaPortfolio();
+              stocks = zerodhaData.stocks;
+              mutualFunds = zerodhaData.mutualFunds;
+              console.log(`Retrieved ${stocks.length} stocks and ${mutualFunds.length} mutual funds`);
+            } catch (zerodhaError: any) {
+              console.error('Error fetching Zerodha portfolio:', zerodhaError);
+              toast.error(`Failed to fetch Zerodha portfolio: ${zerodhaError.message || 'Unknown error'}. Please reconnect your account.`);
+              // If there's an error fetching Zerodha data, we'll show an empty portfolio
+              // This will prompt the user to reconnect their Zerodha account
+            }
+          } else {
+            console.log('User not connected to Zerodha or missing access token');
           }
-        } else {
-          console.log('User not connected to Zerodha or missing access token');
+        } catch (credentialsError: any) {
+          console.error('Error checking Zerodha credentials:', credentialsError);
         }
       }
       

@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import TrustMessage from './TrustMessage';
 import PortfolioService from '@/services/portfolio-service';
 import { toast } from 'sonner';
@@ -16,6 +16,7 @@ interface ZerodhaConnectorProps {
 const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reconnectAttempts, setReconnectAttempts] = useState(0);
   
   // Handler for message from popup
   const handleMessage = useCallback(async (event: MessageEvent) => {
@@ -31,6 +32,9 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
         console.log("Received request token from popup:", event.data.requestToken);
         // Exchange request token for access token
         const success = await PortfolioService.exchangeZerodhaToken(event.data.requestToken);
+        
+        console.log("Token exchange result:", success);
+        
         if (success) {
           toast.success('Connected to Zerodha successfully');
           onConnect();
@@ -93,6 +97,18 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
         setError(errorMessage);
         toast.error(errorMessage);
         setIsLoading(false);
+      } else {
+        // Set up a check to handle case when user closes popup without completing flow
+        const checkPopupClosed = setInterval(() => {
+          if (popup.closed) {
+            clearInterval(checkPopupClosed);
+            // Only show message if we're still in loading state (no token received)
+            if (isLoading) {
+              setIsLoading(false);
+              setError('Login window was closed. Please try again.');
+            }
+          }
+        }, 1000);
       }
     } catch (error: any) {
       console.error('Zerodha connection error:', error);
@@ -101,6 +117,12 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
       toast.error(errorMessage);
       setIsLoading(false);
     }
+  };
+
+  const handleRetry = () => {
+    setReconnectAttempts(prev => prev + 1);
+    setError(null);
+    handleConnectZerodha();
   };
 
   return (
@@ -121,8 +143,20 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
           
           {error && (
             <Alert variant="destructive" className="mb-6">
-              <AlertTitle>Error</AlertTitle>
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Connection Error</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
+              {reconnectAttempts < 3 && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-2" 
+                  onClick={handleRetry}
+                >
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Retry Connection
+                </Button>
+              )}
             </Alert>
           )}
         </CardContent>

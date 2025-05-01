@@ -118,6 +118,42 @@ serve(async (req) => {
       kiteVersion: "3"
     });
 
+    // For debugging, let's first validate the access token
+    try {
+      const userProfileResponse = await fetch("https://api.kite.trade/user/profile", {
+        headers
+      });
+      
+      if (!userProfileResponse.ok) {
+        const errorData = await userProfileResponse.json();
+        console.error(`Invalid access token. Status: ${userProfileResponse.status}, Error:`, errorData);
+        
+        // If token is invalid, we should clear it and ask user to reconnect
+        if (userProfileResponse.status === 403 || userProfileResponse.status === 401) {
+          // Clear the invalid token
+          await supabase
+            .from('zerodha_credentials')
+            .update({ access_token: null })
+            .eq('user_id', user.id);
+            
+          return new Response(
+            JSON.stringify({
+              error: "Your Zerodha session has expired. Please reconnect your account."
+            }),
+            {
+              status: 401, 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            }
+          );
+        }
+      } else {
+        const profileData = await userProfileResponse.json();
+        console.log("User profile validated:", profileData.status === "success");
+      }
+    } catch (error) {
+      console.error("Error validating access token:", error);
+    }
+
     try {
       // Fetch holdings and positions in parallel
       const [holdingsResponse, positionsResponse] = await Promise.all([
@@ -136,8 +172,8 @@ serve(async (req) => {
       // Debug logs
       console.log("Holdings response status:", holdingsResponse.status);
       console.log("Positions response status:", positionsResponse.status);
-      console.log("Holdings data:", JSON.stringify(holdingsData).substring(0, 200) + "...");
-      console.log("Positions data:", JSON.stringify(positionsData).substring(0, 200) + "...");
+      console.log("Holdings data status:", holdingsData.status);
+      console.log("Positions data status:", positionsData.status);
 
       // Check if the requests were successful
       if (!holdingsResponse.ok) {
@@ -176,7 +212,7 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
-    } catch (fetchError) {
+    } catch (fetchError: any) {
       console.error("Error fetching data from Zerodha API:", fetchError);
       return new Response(
         JSON.stringify({
@@ -188,7 +224,7 @@ serve(async (req) => {
         }
       );
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error fetching Zerodha portfolio:", error);
     return new Response(
       JSON.stringify({

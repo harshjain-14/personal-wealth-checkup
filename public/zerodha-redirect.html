@@ -45,6 +45,16 @@
     p {
       color: #6b7280;
     }
+    .debug {
+      margin-top: 1rem;
+      font-size: 0.75rem;
+      color: #9ca3af;
+      text-align: left;
+      max-height: 100px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
   </style>
 </head>
 <body>
@@ -52,37 +62,53 @@
     <div class="spinner"></div>
     <h1>Connecting to Zerodha</h1>
     <p>Please wait while we complete the authorization process...</p>
+    <div id="debug" class="debug"></div>
   </div>
 
   <script>
+    // Debug logging function
+    function logDebug(message) {
+      const debugElem = document.getElementById('debug');
+      const timestamp = new Date().toISOString().substring(11, 23);
+      debugElem.innerHTML += `${timestamp} ${message}\n`;
+      console.log(message);
+    }
+    
     document.addEventListener('DOMContentLoaded', function() {
+      logDebug("Page loaded, parsing URL parameters...");
+      
       // Extract the request token from the URL
       const urlParams = new URLSearchParams(window.location.search);
       const requestToken = urlParams.get('request_token');
+      const status = urlParams.get('status');
       
       if (requestToken) {
-        console.log("Received request token:", requestToken);
+        logDebug(`Received request token: ${requestToken.substring(0, 5)}...`);
+        
         // Send the request token to the parent window
         if (window.opener) {
           try {
+            logDebug("Parent window found, sending token...");
             window.opener.postMessage({ requestToken }, window.location.origin);
-            console.log("Sent request token to parent window");
+            logDebug("Token sent to parent window");
             
             // Close the popup window after a short delay
             setTimeout(() => {
+              logDebug("Closing popup window");
               window.close();
             }, 1500);
           } catch (error) {
-            console.error("Error sending message to parent window:", error);
+            logDebug(`Error: ${error.message}`);
             document.querySelector('.container').innerHTML = `
               <div style="color: #b91c1c;">
                 <h1>Error</h1>
                 <p>Could not communicate with the parent window: ${error.message}</p>
+                <p>Please close this window and try again.</p>
               </div>
             `;
           }
         } else {
-          console.error("No parent window found");
+          logDebug("Error: No parent window found");
           document.querySelector('.container').innerHTML = `
             <div style="color: #b91c1c;">
               <h1>Error</h1>
@@ -90,12 +116,33 @@
             </div>
           `;
         }
+      } else if (status === "error") {
+        // Handle error status
+        const error = urlParams.get('error') || "Unknown error";
+        logDebug(`Error status returned: ${error}`);
+        document.querySelector('.container').innerHTML = `
+          <div style="color: #b91c1c;">
+            <h1>Login Failed</h1>
+            <p>Zerodha authentication failed: ${error}</p>
+            <p>Please close this window and try again.</p>
+          </div>
+        `;
+        
+        // Notify parent window about the error
+        if (window.opener) {
+          try {
+            window.opener.postMessage({ error }, window.location.origin);
+          } catch (e) {
+            logDebug(`Error sending error message to parent: ${e.message}`);
+          }
+        }
       } else {
-        console.error("No request token in URL");
+        logDebug("Error: No request token or status in URL");
         document.querySelector('.container').innerHTML = `
           <div style="color: #b91c1c;">
             <h1>Error</h1>
             <p>No authorization token was received from Zerodha. Please close this window and try again.</p>
+            <p>URL parameters: ${window.location.search}</p>
           </div>
         `;
       }
