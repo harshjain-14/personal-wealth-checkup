@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardDescription, CardFooter, CardTitle } from '@/components/ui/card';
@@ -43,9 +42,9 @@ const DataEntryTabs = ({ portfolioData, onDataSaved, onAnalysisRequest }: DataEn
       setZerodhaConnected(true);
       setActiveTab('external');
       toast.success('Zerodha portfolio data imported successfully');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error importing Zerodha data:', error);
-      toast.error('Failed to import Zerodha portfolio data');
+      toast.error(`Failed to import Zerodha portfolio data: ${error.message || 'Unknown error'}`);
     }
   };
 
@@ -215,6 +214,9 @@ const ZerodhaPortfolioView = ({ stocks, mutualFunds, onRefresh }: ZerodhaPortfol
     setIsRefreshing(true);
     try {
       await onRefresh();
+      toast.success('Portfolio data refreshed successfully');
+    } catch (error: any) {
+      toast.error(`Failed to refresh portfolio: ${error.message || 'Unknown error'}`);
     } finally {
       setIsRefreshing(false);
     }
@@ -282,30 +284,38 @@ const ZerodhaPortfolioView = ({ stocks, mutualFunds, onRefresh }: ZerodhaPortfol
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {stocks.map((stock) => {
-                const value = stock.quantity * stock.currentPrice;
-                const costPrice = stock.quantity * stock.averagePrice;
-                const pnl = value - costPrice;
-                const pnlPercentage = ((stock.currentPrice - stock.averagePrice) / stock.averagePrice) * 100;
-                
-                return (
-                  <tr key={stock.symbol}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-medium text-gray-900">{stock.symbol}</div>
-                      <div className="text-xs text-gray-500">{stock.name}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{stock.quantity}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹{stock.averagePrice.toFixed(2)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹{stock.currentPrice.toFixed(2)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹{value.toLocaleString('en-IN')}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`text-sm ${pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)} ({pnlPercentage.toFixed(2)}%)
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
+              {stocks.length > 0 ? (
+                stocks.map((stock) => {
+                  const value = stock.quantity * stock.currentPrice;
+                  const costPrice = stock.quantity * stock.averagePrice;
+                  const pnl = value - costPrice;
+                  const pnlPercentage = ((stock.currentPrice - stock.averagePrice) / stock.averagePrice) * 100;
+                  
+                  return (
+                    <tr key={stock.symbol}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="font-medium text-gray-900">{stock.symbol}</div>
+                        <div className="text-xs text-gray-500">{stock.name}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{stock.quantity}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹{stock.averagePrice.toFixed(2)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹{stock.currentPrice.toFixed(2)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹{value.toLocaleString('en-IN')}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`text-sm ${pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)} ({pnlPercentage.toFixed(2)}%)
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                    No stocks available in your portfolio
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -326,26 +336,34 @@ const ZerodhaPortfolioView = ({ stocks, mutualFunds, onRefresh }: ZerodhaPortfol
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {mutualFunds.map((fund, index) => {
-                const pnl = fund.currentValue - fund.investedAmount;
-                const pnlPercentage = (pnl / fund.investedAmount) * 100;
-                
-                return (
-                  <tr key={index}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-medium text-gray-900">{fund.name}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{fund.category}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹{fund.investedAmount.toLocaleString('en-IN')}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹{fund.currentValue.toLocaleString('en-IN')}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`text-sm ${pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {pnl >= 0 ? '+' : ''}₹{pnl.toLocaleString('en-IN')} ({pnlPercentage.toFixed(2)}%)
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
+              {mutualFunds.length > 0 ? (
+                mutualFunds.map((fund, index) => {
+                  const pnl = fund.currentValue - fund.investedAmount;
+                  const pnlPercentage = (pnl / fund.investedAmount) * 100;
+                  
+                  return (
+                    <tr key={index}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="font-medium text-gray-900">{fund.name}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{fund.category}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹{fund.investedAmount.toLocaleString('en-IN')}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹{fund.currentValue.toLocaleString('en-IN')}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`text-sm ${pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {pnl >= 0 ? '+' : ''}₹{pnl.toLocaleString('en-IN')} ({pnlPercentage.toFixed(2)}%)
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                    No mutual funds available in your portfolio
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

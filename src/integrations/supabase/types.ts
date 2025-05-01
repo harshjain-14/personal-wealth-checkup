@@ -161,18 +161,21 @@ export type Database = {
       }
       zerodha_credentials: {
         Row: {
+          access_token: string | null
           created_at: string | null
           id: number
           user_id: string | null
           zerodha_user_id: string
         }
         Insert: {
+          access_token?: string | null
           created_at?: string | null
           id?: never
           user_id?: string | null
           zerodha_user_id: string
         }
         Update: {
+          access_token?: string | null
           created_at?: string | null
           id?: never
           user_id?: string | null

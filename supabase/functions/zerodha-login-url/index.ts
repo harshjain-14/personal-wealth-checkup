@@ -17,11 +17,11 @@ serve(async (req) => {
 
   try {
     // Check if environment variables are set
-    if (!KITE_API_KEY || !REDIRECT_URI) {
-      console.error("Missing environment variables: KITE_API_KEY or REDIRECT_URI");
+    if (!KITE_API_KEY) {
+      console.error("Missing environment variable: KITE_API_KEY");
       return new Response(
         JSON.stringify({
-          error: "Server configuration error. Please contact support."
+          error: "Server configuration error. KITE_API_KEY is not set."
         }),
         {
           status: 500,
@@ -30,9 +30,26 @@ serve(async (req) => {
       );
     }
 
+    if (!REDIRECT_URI) {
+      console.error("Missing environment variable: REDIRECT_URI");
+      return new Response(
+        JSON.stringify({
+          error: "Server configuration error. REDIRECT_URI is not set."
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    console.log(`Generating Zerodha login URL with API key: ${KITE_API_KEY} and redirect URI: ${REDIRECT_URI}`);
+
     // Generate Zerodha login URL
     const encodedRedirectUri = encodeURIComponent(REDIRECT_URI);
     const loginUrl = `https://kite.zerodha.com/connect/login?v=3&api_key=${KITE_API_KEY}&redirect_uri=${encodedRedirectUri}`;
+
+    console.log(`Generated login URL: ${loginUrl}`);
 
     return new Response(
       JSON.stringify({ loginUrl }),

@@ -60,9 +60,13 @@ serve(async (req) => {
       );
     }
 
+    console.log(`Processing request token: ${request_token}`);
+
     // Compute checksum
     const checksumInput = `${KITE_API_KEY}${request_token}${KITE_API_SECRET}`;
     const checksum = await sha256(checksumInput);
+
+    console.log(`Generated checksum for token exchange`);
 
     // Exchange token with Zerodha API
     const response = await fetch("https://api.kite.trade/session/token", {
@@ -99,6 +103,7 @@ serve(async (req) => {
     const access_token = data.data?.access_token;
     
     if (!access_token) {
+      console.error("No access token in Zerodha response:", data);
       return new Response(
         JSON.stringify({
           success: false,
@@ -110,6 +115,8 @@ serve(async (req) => {
         }
       );
     }
+
+    console.log(`Received access token from Zerodha`);
 
     // Get the user from Supabase Auth
     const authHeader = req.headers.get('Authorization');
@@ -152,6 +159,8 @@ serve(async (req) => {
       );
     }
 
+    console.log(`Storing access token for user: ${user.id}`);
+
     // Store access token in zerodha_credentials table
     const { error: upsertError } = await supabase
       .from('zerodha_credentials')
@@ -176,6 +185,8 @@ serve(async (req) => {
         }
       );
     }
+
+    console.log(`Successfully stored Zerodha access token for user: ${user.id}`);
 
     return new Response(
       JSON.stringify({

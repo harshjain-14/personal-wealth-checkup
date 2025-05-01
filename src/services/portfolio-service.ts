@@ -1,3 +1,4 @@
+
 // Updated Portfolio service to use Supabase
 
 import { supabase } from "@/integrations/supabase/client";
@@ -194,6 +195,7 @@ const PortfolioService = {
       
       if (error) {
         console.error('Error fetching Zerodha portfolio:', error);
+        toast.error(`Failed to fetch Zerodha portfolio: ${error.message}`);
         throw error;
       }
       
@@ -201,6 +203,7 @@ const PortfolioService = {
       
       if (!data || !data.holdings) {
         console.error('No data returned from Zerodha API');
+        toast.error('No data returned from Zerodha API');
         throw new Error('No data returned from Zerodha API');
       }
       
@@ -240,8 +243,6 @@ const PortfolioService = {
       };
     } catch (error) {
       console.error('Error in getZerodhaPortfolio:', error);
-      // If we encounter an error, we'll throw it instead of returning mock data
-      // This will allow us to show appropriate error messages to the user
       throw error;
     }
   },
@@ -253,12 +254,20 @@ const PortfolioService = {
       
       if (error) {
         console.error('Error getting Zerodha login URL:', error);
+        toast.error(`Failed to get Zerodha login URL: ${error.message}`);
+        return null;
+      }
+      
+      if (!data || !data.loginUrl) {
+        console.error('No login URL returned from function');
+        toast.error('No login URL returned from function');
         return null;
       }
       
       return data.loginUrl;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in getZerodhaLoginUrl:', error);
+      toast.error(`Error in getZerodhaLoginUrl: ${error.message || 'Unknown error'}`);
       return null;
     }
   },
@@ -266,6 +275,8 @@ const PortfolioService = {
   // Exchange Zerodha request token for access token
   exchangeZerodhaToken: async (requestToken: string): Promise<boolean> => {
     try {
+      console.log(`Exchanging Zerodha token: ${requestToken}`);
+      
       const { data, error } = await supabase.functions.invoke('zerodha-exchange-token', {
         body: { request_token: requestToken }
       });
@@ -720,7 +731,7 @@ const PortfolioService = {
           .from('zerodha_credentials')
           .select('access_token')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
         
         if (!error && credentials?.access_token) {
           // User has Zerodha connected, fetch real data
@@ -730,6 +741,7 @@ const PortfolioService = {
             mutualFunds = zerodhaData.mutualFunds;
           } catch (zerodhaError) {
             console.error('Error fetching Zerodha portfolio:', zerodhaError);
+            toast.error('Failed to fetch Zerodha portfolio. Please reconnect your account.');
             // If there's an error fetching Zerodha data, we'll show an empty portfolio
             // This will prompt the user to reconnect their Zerodha account
           }

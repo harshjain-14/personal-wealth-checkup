@@ -70,14 +70,30 @@ serve(async (req) => {
       );
     }
 
+    console.log(`Getting Zerodha credentials for user: ${user.id}`);
+    
     // Get the access token from zerodha_credentials table
     const { data: credentials, error: credentialsError } = await supabase
       .from('zerodha_credentials')
       .select('access_token')
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
 
-    if (credentialsError || !credentials?.access_token) {
+    if (credentialsError) {
+      console.error("Error fetching Zerodha credentials:", credentialsError);
+      return new Response(
+        JSON.stringify({
+          error: `Error fetching Zerodha credentials: ${credentialsError.message}`
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    if (!credentials || !credentials.access_token) {
+      console.error("Zerodha access token not found for user:", user.id);
       return new Response(
         JSON.stringify({
           error: "Zerodha access token not found. Please connect your Zerodha account first."
