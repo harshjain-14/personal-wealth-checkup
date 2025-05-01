@@ -59,6 +59,7 @@ serve(async (req) => {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
 
     if (userError || !user) {
+      console.error("User authentication failed:", userError);
       return new Response(
         JSON.stringify({
           error: "User authentication failed"
@@ -117,66 +118,81 @@ serve(async (req) => {
       kiteVersion: "3"
     });
 
-    // Fetch holdings and positions in parallel
-    const [holdingsResponse, positionsResponse] = await Promise.all([
-      fetch("https://api.kite.trade/portfolio/holdings", { 
-        headers 
-      }),
-      fetch("https://api.kite.trade/portfolio/positions", { 
-        headers 
-      })
-    ]);
-
-    // Parse the responses
-    const holdingsData = await holdingsResponse.json();
-    const positionsData = await positionsResponse.json();
-
-    // Debug logs
-    console.log("Holdings response status:", holdingsResponse.status);
-    console.log("Positions response status:", positionsResponse.status);
-
-    // Check if the requests were successful
-    if (!holdingsResponse.ok) {
-      console.error("Zerodha holdings API error:", holdingsData);
-      return new Response(
-        JSON.stringify({
-          error: holdingsData.message || "Failed to fetch holdings from Zerodha"
+    try {
+      // Fetch holdings and positions in parallel
+      const [holdingsResponse, positionsResponse] = await Promise.all([
+        fetch("https://api.kite.trade/portfolio/holdings", { 
+          headers 
         }),
-        {
-          status: holdingsResponse.status,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
+        fetch("https://api.kite.trade/portfolio/positions", { 
+          headers 
+        })
+      ]);
 
-    if (!positionsResponse.ok) {
-      console.error("Zerodha positions API error:", positionsData);
-      return new Response(
-        JSON.stringify({
-          error: positionsData.message || "Failed to fetch positions from Zerodha"
-        }),
-        {
-          status: positionsResponse.status,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
+      // Parse the responses
+      const holdingsData = await holdingsResponse.json();
+      const positionsData = await positionsResponse.json();
 
-    // Return the portfolio data
-    return new Response(
-      JSON.stringify({
-        holdings: holdingsData.data,
-        positions: positionsData.data
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      // Debug logs
+      console.log("Holdings response status:", holdingsResponse.status);
+      console.log("Positions response status:", positionsResponse.status);
+      console.log("Holdings data:", JSON.stringify(holdingsData).substring(0, 200) + "...");
+      console.log("Positions data:", JSON.stringify(positionsData).substring(0, 200) + "...");
+
+      // Check if the requests were successful
+      if (!holdingsResponse.ok) {
+        console.error("Zerodha holdings API error:", holdingsData);
+        return new Response(
+          JSON.stringify({
+            error: holdingsData.message || "Failed to fetch holdings from Zerodha"
+          }),
+          {
+            status: holdingsResponse.status,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
       }
-    );
+
+      if (!positionsResponse.ok) {
+        console.error("Zerodha positions API error:", positionsData);
+        return new Response(
+          JSON.stringify({
+            error: positionsData.message || "Failed to fetch positions from Zerodha"
+          }),
+          {
+            status: positionsResponse.status,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+
+      // Return the portfolio data
+      return new Response(
+        JSON.stringify({
+          holdings: holdingsData.data || [],
+          positions: positionsData.data || []
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    } catch (fetchError) {
+      console.error("Error fetching data from Zerodha API:", fetchError);
+      return new Response(
+        JSON.stringify({
+          error: `Error fetching data from Zerodha API: ${fetchError.message || 'Unknown error'}`
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
   } catch (error) {
     console.error("Error fetching Zerodha portfolio:", error);
     return new Response(
       JSON.stringify({
-        error: "Failed to fetch portfolio data"
+        error: "Failed to fetch portfolio data: " + (error instanceof Error ? error.message : String(error))
       }),
       {
         status: 500,

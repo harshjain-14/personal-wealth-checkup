@@ -61,15 +61,28 @@
       const requestToken = urlParams.get('request_token');
       
       if (requestToken) {
+        console.log("Received request token:", requestToken);
         // Send the request token to the parent window
         if (window.opener) {
-          window.opener.postMessage({ requestToken }, window.origin);
-          
-          // Close the popup window after a short delay
-          setTimeout(() => {
-            window.close();
-          }, 1500);
+          try {
+            window.opener.postMessage({ requestToken }, window.location.origin);
+            console.log("Sent request token to parent window");
+            
+            // Close the popup window after a short delay
+            setTimeout(() => {
+              window.close();
+            }, 1500);
+          } catch (error) {
+            console.error("Error sending message to parent window:", error);
+            document.querySelector('.container').innerHTML = `
+              <div style="color: #b91c1c;">
+                <h1>Error</h1>
+                <p>Could not communicate with the parent window: ${error.message}</p>
+              </div>
+            `;
+          }
         } else {
+          console.error("No parent window found");
           document.querySelector('.container').innerHTML = `
             <div style="color: #b91c1c;">
               <h1>Error</h1>
@@ -78,6 +91,7 @@
           `;
         }
       } else {
+        console.error("No request token in URL");
         document.querySelector('.container').innerHTML = `
           <div style="color: #b91c1c;">
             <h1>Error</h1>

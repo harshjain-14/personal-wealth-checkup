@@ -1,4 +1,3 @@
-
 // Updated Portfolio service to use Supabase
 
 import { supabase } from "@/integrations/supabase/client";
@@ -191,7 +190,9 @@ const PortfolioService = {
       console.log("Fetching Zerodha portfolio data...");
       
       // Call the Zerodha portfolio API via Supabase Edge Function
-      const { data, error } = await supabase.functions.invoke('zerodha-portfolio', {});
+      const { data, error } = await supabase.functions.invoke('zerodha-portfolio', {
+        method: 'GET'
+      });
       
       if (error) {
         console.error('Error fetching Zerodha portfolio:', error);
@@ -201,7 +202,7 @@ const PortfolioService = {
       
       console.log("Zerodha API response:", data);
       
-      if (!data || !data.holdings) {
+      if (!data || (!data.holdings && !data.positions)) {
         console.error('No data returned from Zerodha API');
         toast.error('No data returned from Zerodha API');
         throw new Error('No data returned from Zerodha API');
@@ -215,7 +216,14 @@ const PortfolioService = {
       if (Array.isArray(data.holdings)) {
         data.holdings.forEach((holding: any) => {
           // Check if it's a mutual fund or stock
-          if (holding.type === 'EQ') {
+          if (holding.tradingsymbol && holding.tradingsymbol.includes('MF')) {
+            mutualFunds.push({
+              name: holding.tradingsymbol,
+              investedAmount: holding.average_price * holding.quantity,
+              currentValue: holding.last_price * holding.quantity,
+              category: 'Mutual Fund' // Zerodha API doesn't provide category, so we use a default
+            });
+          } else {
             stocks.push({
               symbol: holding.tradingsymbol,
               name: holding.tradingsymbol,
@@ -223,13 +231,6 @@ const PortfolioService = {
               averagePrice: holding.average_price,
               currentPrice: holding.last_price,
               sector: holding.sector || 'N/A' // Use sector if available, otherwise N/A
-            });
-          } else if (holding.type === 'MF') {
-            mutualFunds.push({
-              name: holding.tradingsymbol,
-              investedAmount: holding.average_price * holding.quantity,
-              currentValue: holding.last_price * holding.quantity,
-              category: 'Mutual Fund' // Zerodha API doesn't provide category, so we use a default
             });
           }
         });
@@ -250,7 +251,9 @@ const PortfolioService = {
   // Get Zerodha login URL from edge function
   getZerodhaLoginUrl: async (): Promise<string | null> => {
     try {
-      const { data, error } = await supabase.functions.invoke('zerodha-login-url', {});
+      const { data, error } = await supabase.functions.invoke('zerodha-login-url', {
+        method: 'GET'
+      });
       
       if (error) {
         console.error('Error getting Zerodha login URL:', error);
@@ -278,6 +281,7 @@ const PortfolioService = {
       console.log(`Exchanging Zerodha token: ${requestToken}`);
       
       const { data, error } = await supabase.functions.invoke('zerodha-exchange-token', {
+        method: 'POST',
         body: { request_token: requestToken }
       });
       

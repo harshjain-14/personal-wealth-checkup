@@ -19,7 +19,10 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
   
   // Handler for message from popup
   const handleMessage = useCallback(async (event: MessageEvent) => {
-    if (event.origin !== window.origin) return;
+    if (event.origin !== window.location.origin) {
+      console.log(`Ignoring message from unexpected origin: ${event.origin}, expected: ${window.location.origin}`);
+      return;
+    }
     
     if (event.data.requestToken) {
       setIsLoading(true);

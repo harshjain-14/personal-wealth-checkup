@@ -13,11 +13,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Function to compute SHA-256 hash
-async function sha256(message: string): Promise<string> {
+// Function to create checksum
+async function generateChecksum(apiKey: string, requestToken: string, apiSecret: string): Promise<string> {
+  const data = apiKey + requestToken + apiSecret;
   const encoder = new TextEncoder();
-  const data = encoder.encode(message);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const messageBuffer = encoder.encode(data);
+  const hashBuffer = await crypto.subtle.digest("SHA256", messageBuffer);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
@@ -62,10 +63,8 @@ serve(async (req) => {
 
     console.log(`Processing request token: ${request_token}`);
 
-    // Compute checksum
-    const checksumInput = `${KITE_API_KEY}${request_token}${KITE_API_SECRET}`;
-    const checksum = await sha256(checksumInput);
-
+    // Generate checksum for the request
+    const checksum = await generateChecksum(KITE_API_KEY, request_token, KITE_API_SECRET);
     console.log(`Generated checksum for token exchange`);
 
     // Exchange token with Zerodha API
@@ -82,15 +81,16 @@ serve(async (req) => {
       }).toString()
     });
 
-    const data = await response.json();
+    const responseData = await response.json();
+    console.log("Zerodha API response:", JSON.stringify(responseData));
 
     // Check if the token exchange was successful
     if (!response.ok) {
-      console.error("Zerodha token exchange failed:", data);
+      console.error("Zerodha token exchange failed:", responseData);
       return new Response(
         JSON.stringify({
           success: false,
-          message: data.message || "Failed to exchange token with Zerodha"
+          message: responseData.message || "Failed to exchange token with Zerodha"
         }),
         {
           status: response.status,
@@ -100,10 +100,10 @@ serve(async (req) => {
     }
 
     // Extract access token
-    const access_token = data.data?.access_token;
+    const access_token = responseData.data?.access_token;
     
     if (!access_token) {
-      console.error("No access token in Zerodha response:", data);
+      console.error("No access token in Zerodha response:", responseData);
       return new Response(
         JSON.stringify({
           success: false,
@@ -121,6 +121,7 @@ serve(async (req) => {
     // Get the user from Supabase Auth
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
+      console.error("No authorization header present");
       return new Response(
         JSON.stringify({
           success: false,
@@ -167,7 +168,7 @@ serve(async (req) => {
       .upsert([
         { 
           user_id: user.id,
-          zerodha_user_id: data.data?.user_id || '',
+          zerodha_user_id: responseData.data?.user_id || '',
           access_token: access_token
         }
       ]);
@@ -177,7 +178,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: false,
-          message: "Failed to store access token"
+          message: "Failed to store access token: " + upsertError.message
         }),
         {
           status: 500,
@@ -202,7 +203,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        message: "Internal server error"
+        message: "Internal server error: " + (error instanceof Error ? error.message : String(error))
       }),
       {
         status: 500,

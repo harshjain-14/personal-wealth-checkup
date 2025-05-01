@@ -60,7 +60,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error generating Zerodha login URL:", error);
     return new Response(
-      JSON.stringify({ error: "Failed to generate login URL" }),
+      JSON.stringify({ error: "Failed to generate login URL: " + (error instanceof Error ? error.message : String(error)) }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
