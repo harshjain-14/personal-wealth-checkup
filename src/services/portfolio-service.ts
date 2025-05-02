@@ -1,3 +1,4 @@
+
 // Updated Portfolio service to use Supabase
 
 import { supabase } from "@/integrations/supabase/client";
@@ -262,15 +263,15 @@ const PortfolioService = {
       const userId = session.user.id;
       const now = new Date().toISOString();
       
-      // Store the raw portfolio data as JSON
+      // Use the REST API directly with a type cast to avoid TypeScript errors
+      // This is necessary because the portfolio_snapshots table isn't in the generated types
       const { error } = await supabase
         .from('portfolio_snapshots')
         .insert({
           user_id: userId,
           snapshot_data: portfolioData,
           snapshot_date: now
-        })
-        .select();
+        } as any);
 
       if (error) {
         console.error('Error saving portfolio snapshot:', error);
