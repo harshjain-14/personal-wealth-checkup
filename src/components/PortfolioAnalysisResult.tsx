@@ -1,3 +1,4 @@
+
 import { BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,9 +16,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { 
   AnalysisReport, 
-  PortfolioInsight, 
-  SectorBreakdown, 
-  AssetAllocation 
+  PortfolioInsight,
+  AssetAllocationItem
 } from '@/services/analysis-service';
 
 interface PortfolioAnalysisResultProps {

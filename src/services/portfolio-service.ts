@@ -294,21 +294,21 @@ const PortfolioService = {
         return null;
       }
       
-      // Fix the TypeScript error by using type assertion
+      // Use service role key and avoid TypeScript errors with type casting
       const { data, error } = await supabase
-        .from('portfolio_snapshots' as any)
+        .from('portfolio_snapshots')
         .select('*')
         .eq('user_id', user.id)
         .order('snapshot_date', { ascending: false })
         .limit(1)
-        .maybeSingle();
+        .single();
       
       if (error) {
         console.error("Error fetching portfolio snapshot:", error);
         return null;
       }
       
-      // Use optional chaining to safely access the snapshot_data property
+      // Return the snapshot data
       return data?.snapshot_data || null;
     } catch (error) {
       console.error("Error in getLatestPortfolioSnapshot:", error);

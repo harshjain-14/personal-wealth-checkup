@@ -20,7 +20,7 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
-  const [portfolioViewed, setPortfolioViewed] = useState(false);
+  const [showPortfolio, setShowPortfolio] = useState(false);
   
   useEffect(() => {
     // Check if user is already connected to Zerodha on component mount
@@ -61,7 +61,7 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
         if (success) {
           toast.success('Connected to Zerodha successfully');
           setIsConnected(true);
-          setPortfolioViewed(false); // Reset when reconnected
+          setShowPortfolio(false); // Reset when reconnected
         } else {
           const errorMessage = 'Failed to connect to Zerodha. Please try again.';
           setError(errorMessage);
@@ -150,12 +150,12 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
   };
 
   const handleViewPortfolio = () => {
-    setPortfolioViewed(true);
+    setShowPortfolio(true);
     onConnect();
   };
   
   const handleBackToOptions = () => {
-    setPortfolioViewed(false);
+    setShowPortfolio(false);
   };
 
   const handleLogoutZerodha = async () => {
@@ -165,7 +165,7 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
       if (success) {
         toast.success('Disconnected from Zerodha successfully');
         setIsConnected(false);
-        setPortfolioViewed(false);
+        setShowPortfolio(false);
       } else {
         toast.error('Failed to disconnect from Zerodha');
       }
@@ -233,7 +233,7 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
         <CardFooter className="flex flex-col space-y-3">
           {isConnected ? (
             <div className="w-full space-y-3">
-              {!portfolioViewed ? (
+              {!showPortfolio ? (
                 <>
                   <Button 
                     onClick={handleViewPortfolio}

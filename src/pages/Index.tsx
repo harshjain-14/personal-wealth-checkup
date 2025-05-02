@@ -29,6 +29,7 @@ const Index = () => {
   useEffect(() => {
     if (isAuthenticated) {
       loadPortfolioData();
+      checkForExistingAnalysis();
     }
   }, [isAuthenticated]);
   
@@ -47,6 +48,18 @@ const Index = () => {
     }
   };
   
+  // Check if there's an existing analysis
+  const checkForExistingAnalysis = async () => {
+    try {
+      const existingAnalysis = await AnalysisService.getLatestAnalysis();
+      if (existingAnalysis) {
+        setAnalysisReport(existingAnalysis);
+      }
+    } catch (error) {
+      console.error("Error checking for existing analysis:", error);
+    }
+  };
+  
   // Handle logout
   const handleLogout = () => {
     signOut();
@@ -56,7 +69,7 @@ const Index = () => {
   
   // Handle data refresh
   const handleRefresh = async () => {
-    if (analysisReport) {
+    if (dataView === 'results') {
       await generateAnalysis();
     } else {
       await loadPortfolioData();

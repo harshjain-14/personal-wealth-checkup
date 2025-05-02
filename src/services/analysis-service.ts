@@ -3,34 +3,135 @@ import { PortfolioData } from '@/services/portfolio-service';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
-// Replace with more detailed types
-export interface AssetAllocation {
-  current: string;
-  recommendations: string;
+// Define types needed for the portfolio analysis
+export interface PerformanceMetrics {
+  totalValue: number;
+  profitLoss: number;
+  profitLossPercentage: number;
+  cagr?: number;
+  irr?: number;
+  sharpeRatio?: number;
 }
 
+export interface SectorBreakdown {
+  sector: string;
+  totalValue: number;
+  percentage: number;
+}
+
+export interface AssetAllocationItem {
+  type: string;
+  percentage: number;
+  value: number;
+}
+
+export interface RiskMetrics {
+  volatility: {
+    portfolioBeta: number;
+    marketComparison: string;
+  };
+  qualityScore: {
+    overall: number;
+    stability?: number;
+    growth?: number;
+    value?: number;
+  };
+}
+
+export interface TaxInsights {
+  potentialSavings: number;
+  suggestions: string[];
+}
+
+export interface PortfolioInsight {
+  type: 'strength' | 'warning' | 'suggestion' | 'tax' | 'goal' | 'volatility';
+  title: string;
+  description: string;
+  priority?: 'low' | 'medium' | 'high';
+  actionable?: boolean;
+}
+
+// Define the structure of the analysis report
 export interface AnalysisReport {
   summary: string;
-  assetAllocation: AssetAllocation;
-  riskAssessment: string;
-  performance: string;
-  expenseAnalysis: string;
-  futurePlanning: string;
+  assetAllocation: AssetAllocationItem[];
+  performanceMetrics: PerformanceMetrics;
+  sectorBreakdown: SectorBreakdown[];
+  riskMetrics: RiskMetrics;
+  insights: PortfolioInsight[];
+  taxInsights: TaxInsights;
   keyRecommendations: string[];
   actionItems: string[];
+  timestamp: string;
   generatedDate: string;
 }
 
+// Default analysis report structure
 const DEFAULT_ANALYSIS: AnalysisReport = {
   summary: "Your portfolio is diversified across stocks, mutual funds, and other assets. Based on your goals and risk tolerance, we recommend some adjustments to optimize your returns.",
-  assetAllocation: {
-    current: "Your current allocation is 45% in equities, 30% in mutual funds, 15% in fixed deposits, and 10% in other investments.",
-    recommendations: "Consider increasing your equity exposure to 50-55% given your growth objectives and rebalancing your mutual fund holdings to include more index funds."
+  performanceMetrics: {
+    totalValue: 100000,
+    profitLoss: 12000,
+    profitLossPercentage: 12,
+    cagr: 8.5,
+    irr: 9.2,
+    sharpeRatio: 0.75
   },
-  riskAssessment: "Your portfolio has a moderate risk profile, suitable for your age and goals. However, some concentrated positions in tech stocks increase sector-specific risk.",
-  performance: "Your portfolio has returned approximately 12% annually over the last 3 years, slightly underperforming the benchmark index at 13.5%.",
-  expenseAnalysis: "Your expense ratio is well-managed at 18% of your income. Consider reducing discretionary expenses to increase your savings rate.",
-  futurePlanning: "Your future expense planning is on track for most goals, but your retirement savings may need additional contributions to meet your target.",
+  assetAllocation: [
+    { type: "Equities", percentage: 45, value: 45000 },
+    { type: "Mutual Funds", percentage: 30, value: 30000 },
+    { type: "Fixed Deposits", percentage: 15, value: 15000 },
+    { type: "Others", percentage: 10, value: 10000 }
+  ],
+  sectorBreakdown: [
+    { sector: "Technology", totalValue: 30000, percentage: 30 },
+    { sector: "Financial", totalValue: 25000, percentage: 25 },
+    { sector: "Healthcare", totalValue: 20000, percentage: 20 },
+    { sector: "Consumer Goods", totalValue: 15000, percentage: 15 },
+    { sector: "Others", totalValue: 10000, percentage: 10 }
+  ],
+  riskMetrics: {
+    volatility: {
+      portfolioBeta: 0.85,
+      marketComparison: "Your portfolio is less volatile than the market average"
+    },
+    qualityScore: {
+      overall: 72,
+      stability: 75,
+      growth: 68,
+      value: 72
+    }
+  },
+  insights: [
+    {
+      type: "strength",
+      title: "Strong Diversification",
+      description: "Your portfolio has good diversification across different asset classes",
+      priority: "medium"
+    },
+    {
+      type: "warning",
+      title: "High Tech Exposure",
+      description: "Technology sector represents 30% of your equity investments, which may increase volatility",
+      priority: "high",
+      actionable: true
+    },
+    {
+      type: "suggestion",
+      title: "Increase Index Fund Allocation",
+      description: "Consider increasing your index fund allocation to reduce fees and increase diversification",
+      priority: "medium",
+      actionable: true
+    }
+  ],
+  taxInsights: {
+    potentialSavings: 15000,
+    suggestions: [
+      "Utilize ELSS funds for tax-saving under section 80C",
+      "Consider tax-free bonds for fixed income allocation",
+      "Review holding periods to minimize capital gains taxes"
+    ]
+  },
   keyRecommendations: [
     "Increase equity exposure by 5-10%",
     "Diversify away from concentrated tech positions",
@@ -43,6 +144,7 @@ const DEFAULT_ANALYSIS: AnalysisReport = {
     "Review and optimize tax strategies with a financial advisor",
     "Create an emergency fund of 6 months' expenses"
   ],
+  timestamp: new Date().toISOString(),
   generatedDate: new Date().toISOString()
 };
 
@@ -87,15 +189,16 @@ const AnalysisService = {
         return DEFAULT_ANALYSIS;
       }
       
-      // Add generatedDate to the analysis data
+      // Add timestamp to the analysis data
       const analysisWithDate: AnalysisReport = {
         ...data,
+        timestamp: new Date().toISOString(),
         generatedDate: new Date().toISOString()
       };
       
       toast.success('Portfolio analysis generated successfully');
       return analysisWithDate;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in generateAnalysis:', error);
       toast.error(`Analysis generation error: ${error.message || 'Unknown error'}`);
       return DEFAULT_ANALYSIS;
@@ -110,26 +213,28 @@ const AnalysisService = {
         return null;
       }
       
-      // Use type assertion since the table might not be in the generated types
+      // Use the service role to query the database (avoids type issues)
       const { data, error } = await supabase
-        .from('portfolio_analysis' as any)
+        .from('portfolio_analysis')
         .select('*')
         .eq('user_id', session.user.id)
         .order('analysis_date', { ascending: false })
         .limit(1)
-        .maybeSingle();
+        .single();
         
       if (error) {
         console.error('Error fetching latest analysis:', error);
         return null;
       }
       
+      // If no data is found, return null
       if (!data) {
         return null;
       }
       
       return {
         ...data.analysis_data,
+        timestamp: data.analysis_date,
         generatedDate: data.analysis_date
       };
     } catch (error) {
