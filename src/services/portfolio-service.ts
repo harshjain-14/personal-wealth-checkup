@@ -1,4 +1,3 @@
-
 // Updated Portfolio service to use Supabase
 
 import { supabase } from "@/integrations/supabase/client";
@@ -263,25 +262,56 @@ const PortfolioService = {
       const userId = session.user.id;
       const now = new Date().toISOString();
       
-      // Use the REST API directly with a type cast to avoid TypeScript errors
-      // This is necessary because the portfolio_snapshots table isn't in the generated types
+      // Use a TypeScript type assertion to work around the type checking limitation
+      // This is necessary because the portfolio_snapshots table isn't in the generated types yet
       const { error } = await supabase
-        .from('portfolio_snapshots')
+        .from('portfolio_snapshots' as any)
         .insert({
           user_id: userId,
           snapshot_data: portfolioData,
           snapshot_date: now
-        } as any);
+        });
 
       if (error) {
         console.error('Error saving portfolio snapshot:', error);
         return false;
       }
 
+      console.log('Portfolio snapshot saved successfully');
       return true;
     } catch (error) {
       console.error('Error saving portfolio to database:', error);
       return false;
+    }
+  },
+  
+  // Get latest portfolio snapshot from DB
+  getLatestPortfolioSnapshot: async (): Promise<any | null> => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        return null;
+      }
+      
+      // Use a TypeScript type assertion to work around the type checking limitation
+      const { data, error } = await supabase
+        .from('portfolio_snapshots' as any)
+        .select('*')
+        .eq('user_id', user.id)
+        .order('snapshot_date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (error) {
+        console.error("Error fetching portfolio snapshot:", error);
+        return null;
+      }
+      
+      return data?.snapshot_data || null;
+    } catch (error) {
+      console.error("Error in getLatestPortfolioSnapshot:", error);
+      return null;
     }
   },
   
@@ -852,8 +882,37 @@ const PortfolioService = {
             } catch (zerodhaError: any) {
               console.error('Error fetching Zerodha portfolio:', zerodhaError);
               toast.error(`Failed to fetch Zerodha portfolio: ${zerodhaError.message || 'Unknown error'}. Please reconnect your account.`);
-              // If there's an error fetching Zerodha data, we'll show an empty portfolio
-              // This will prompt the user to reconnect their Zerodha account
+              
+              // Try to get data from the latest snapshot
+              const snapshotData = await PortfolioService.getLatestPortfolioSnapshot();
+              if (snapshotData) {
+                console.log('Using portfolio data from latest snapshot');
+                
+                // Process snapshot data
+                if (Array.isArray(snapshotData.holdings)) {
+                  snapshotData.holdings.forEach((holding: any) => {
+                    if (holding.tradingsymbol && holding.tradingsymbol.includes('MF')) {
+                      mutualFunds.push({
+                        name: holding.tradingsymbol,
+                        investedAmount: holding.average_price * holding.quantity,
+                        currentValue: holding.last_price * holding.quantity,
+                        category: 'Mutual Fund'
+                      });
+                    } else {
+                      stocks.push({
+                        symbol: holding.tradingsymbol,
+                        name: holding.tradingsymbol,
+                        quantity: holding.quantity,
+                        averagePrice: holding.average_price,
+                        currentPrice: holding.last_price,
+                        sector: holding.sector || 'N/A'
+                      });
+                    }
+                  });
+                }
+                
+                console.log(`Retrieved ${stocks.length} stocks and ${mutualFunds.length} mutual funds from snapshot`);
+              }
             }
           } else {
             console.log('User not connected to Zerodha or missing access token');

@@ -105,6 +105,30 @@ export type Database = {
         }
         Relationships: []
       }
+      portfolio_snapshots: {
+        Row: {
+          created_at: string
+          id: number
+          snapshot_data: Json
+          snapshot_date: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          snapshot_data: Json
+          snapshot_date?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          snapshot_data?: Json
+          snapshot_date?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           additional_info: string | null

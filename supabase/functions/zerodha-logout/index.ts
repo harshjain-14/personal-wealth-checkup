@@ -111,8 +111,11 @@ serve(async (req) => {
 
     try {
       // Call Zerodha logout endpoint
+      const logoutUrl = `https://api.kite.trade/session/token?api_key=${KITE_API_KEY}&access_token=${accessToken}`;
+      console.log(`Calling Zerodha logout API: ${logoutUrl.replace(accessToken, '[ACCESS_TOKEN]')}`);
+      
       const logoutResponse = await fetch(
-        `https://api.kite.trade/session/token?api_key=${KITE_API_KEY}&access_token=${accessToken}`,
+        logoutUrl,
         {
           method: 'DELETE',
           headers: {
@@ -121,17 +124,33 @@ serve(async (req) => {
         }
       );
 
-      const responseData = await logoutResponse.json();
+      let responseData;
+      try {
+        const responseText = await logoutResponse.text();
+        responseData = JSON.parse(responseText);
+      } catch (e) {
+        console.error("Failed to parse Zerodha logout response");
+        responseData = { status: "error", message: "Failed to parse response" };
+      }
+      
       console.log("Zerodha logout response:", responseData);
 
       if (!logoutResponse.ok) {
         console.error("Zerodha logout failed:", responseData);
+        // Clear the access token anyway, as we want to disconnect even if Zerodha's API fails
+        await supabaseAdmin
+          .from('zerodha_credentials')
+          .update({ access_token: null })
+          .eq('user_id', user.id);
+          
         return new Response(
           JSON.stringify({
-            error: "Failed to invalidate Zerodha session: " + (responseData.message || "Unknown error")
+            warning: "Failed to invalidate Zerodha session: " + (responseData.message || "Unknown error"),
+            success: true,
+            message: "Disconnected Zerodha account (token cleared locally)"
           }),
           {
-            status: logoutResponse.status,
+            status: 200,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           }
         );
@@ -168,12 +187,21 @@ serve(async (req) => {
       );
     } catch (fetchError: any) {
       console.error("Error calling Zerodha logout API:", fetchError);
+      
+      // Clear the access token anyway to ensure local disconnect
+      await supabaseAdmin
+        .from('zerodha_credentials')
+        .update({ access_token: null })
+        .eq('user_id', user.id);
+        
       return new Response(
         JSON.stringify({
-          error: `Error calling Zerodha logout API: ${fetchError.message || 'Unknown error'}`
+          warning: `Error calling Zerodha logout API: ${fetchError.message || 'Unknown error'}`,
+          success: true,
+          message: "Disconnected Zerodha account (token cleared locally)"
         }),
         {
-          status: 500,
+          status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );

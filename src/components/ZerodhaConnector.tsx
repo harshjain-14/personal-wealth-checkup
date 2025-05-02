@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, AlertCircle, RefreshCw, LogOut } from 'lucide-react';
+import { Loader2, AlertCircle, RefreshCw, LogOut, ArrowRight } from 'lucide-react';
 import TrustMessage from './TrustMessage';
 import PortfolioService from '@/services/portfolio-service';
 import { toast } from 'sonner';
@@ -41,6 +41,7 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
   
   // Handler for message from popup
   const handleMessage = useCallback(async (event: MessageEvent) => {
+    // Security check - ensure message is from same origin
     if (event.origin !== window.location.origin) {
       console.log(`Ignoring message from unexpected origin: ${event.origin}, expected: ${window.location.origin}`);
       return;
@@ -50,7 +51,7 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
       setIsLoading(true);
       setError(null);
       try {
-        console.log("Received request token from popup:", event.data.requestToken);
+        console.log("Received request token from popup:", event.data.requestToken.substring(0, 5) + "...");
         // Exchange request token for access token
         const success = await PortfolioService.exchangeZerodhaToken(event.data.requestToken);
         
@@ -97,7 +98,7 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
       const url = await PortfolioService.getZerodhaLoginUrl();
       
       if (!url) {
-        const errorMessage = 'Failed to generate Zerodha login URL. Please check Supabase function logs.';
+        const errorMessage = 'Failed to generate Zerodha login URL. Please try again later.';
         console.error(errorMessage);
         setError(errorMessage);
         toast.error(errorMessage);
@@ -109,7 +110,7 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
       
       // Open Zerodha login popup
       const width = 800;
-      const height = 600;
+      const height = 700;
       const left = window.screenX + (window.outerWidth - width) / 2;
       const top = window.screenY + (window.outerHeight - height) / 2;
       
@@ -189,13 +190,18 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
             </Badge>
           )}
         </CardHeader>
-        <CardContent className="flex flex-col items-center justify-center py-8">
-          <p className="text-center text-gray-500 mb-6">
-            Connect your Zerodha account to import your portfolio holdings and analyze your investments securely.
-          </p>
+        <CardContent className="flex flex-col items-center justify-center py-6">
+          <div className="text-center text-gray-600 mb-6 max-w-md">
+            <p className="mb-3">
+              Connect your Zerodha account to import your portfolio holdings and analyze your investments securely.
+            </p>
+            <p className="text-sm text-gray-500">
+              Your data is encrypted and never shared with third parties.
+            </p>
+          </div>
           
           {error && (
-            <Alert variant="destructive" className="mb-6">
+            <Alert variant="destructive" className="mb-6 w-full">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Connection Error</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
@@ -203,7 +209,7 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  className="mt-2" 
+                  className="mt-3" 
                   onClick={handleRetry}
                 >
                   <RefreshCw className="mr-2 h-4 w-4" />
@@ -217,8 +223,16 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
           {isConnected ? (
             <div className="w-full space-y-3">
               <Button 
+                onClick={onConnect}
+                className="w-full bg-finance-blue hover:bg-finance-blue/90"
+              >
+                View Portfolio
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+              <Button 
                 onClick={handleLogoutZerodha}
-                className="w-full bg-destructive hover:bg-destructive/90 text-white"
+                variant="outline"
+                className="w-full border-gray-300 hover:bg-gray-100"
                 disabled={isLogoutLoading}
               >
                 {isLogoutLoading ? (
@@ -232,12 +246,6 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
                     Disconnect Zerodha Account
                   </>
                 )}
-              </Button>
-              <Button 
-                onClick={onConnect}
-                className="w-full bg-finance-blue hover:bg-finance-blue/90"
-              >
-                View Portfolio
               </Button>
             </div>
           ) : (

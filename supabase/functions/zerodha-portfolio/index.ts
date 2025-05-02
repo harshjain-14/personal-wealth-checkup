@@ -126,7 +126,14 @@ serve(async (req) => {
       });
       
       if (!userProfileResponse.ok) {
-        const errorData = await userProfileResponse.json();
+        const errorText = await userProfileResponse.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          errorData = { message: errorText };
+        }
+        
         console.error(`Invalid access token. Status: ${userProfileResponse.status}, Error:`, errorData);
         
         // If token is invalid, we should clear it and ask user to reconnect
@@ -147,12 +154,31 @@ serve(async (req) => {
             }
           );
         }
-      } else {
-        const profileData = await userProfileResponse.json();
-        console.log("User profile validated:", profileData.status === "success");
+        
+        return new Response(
+          JSON.stringify({
+            error: `Failed to validate Zerodha token: ${errorData.message || "Unknown error"}`
+          }),
+          {
+            status: userProfileResponse.status,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
       }
+      
+      const profileData = await userProfileResponse.json();
+      console.log("User profile validated:", profileData.status === "success");
     } catch (error) {
       console.error("Error validating access token:", error);
+      return new Response(
+        JSON.stringify({
+          error: `Error validating access token: ${error.message || "Unknown error"}`
+        }),
+        {
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
     }
 
     try {
@@ -167,8 +193,24 @@ serve(async (req) => {
       ]);
 
       // Parse the responses
-      const holdingsData = await holdingsResponse.json();
-      const positionsData = await positionsResponse.json();
+      const holdingsText = await holdingsResponse.text();
+      const positionsText = await positionsResponse.text();
+      
+      let holdingsData, positionsData;
+      
+      try {
+        holdingsData = JSON.parse(holdingsText);
+      } catch (e) {
+        console.error("Failed to parse holdings response:", holdingsText);
+        holdingsData = { status: "error", message: "Failed to parse response" };
+      }
+      
+      try {
+        positionsData = JSON.parse(positionsText);
+      } catch (e) {
+        console.error("Failed to parse positions response:", positionsText);
+        positionsData = { status: "error", message: "Failed to parse response" };
+      }
 
       // Debug logs
       console.log("Holdings response status:", holdingsResponse.status);
@@ -176,10 +218,6 @@ serve(async (req) => {
       console.log("Holdings data status:", holdingsData.status);
       console.log("Positions data status:", positionsData.status);
       
-      // Log full responses for debugging
-      console.log("Holdings data:", JSON.stringify(holdingsData).substring(0, 200) + "...");
-      console.log("Positions data:", JSON.stringify(positionsData).substring(0, 200) + "...");
-
       // Check if the requests were successful
       if (!holdingsResponse.ok) {
         console.error("Zerodha holdings API error:", holdingsData);

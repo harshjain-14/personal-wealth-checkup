@@ -118,21 +118,36 @@ serve(async (req) => {
       body: formData.toString()
     });
 
+    const responseText = await zerodhaResponse.text();
+    let responseData;
+
+    try {
+      responseData = JSON.parse(responseText);
+    } catch (e) {
+      console.error("Failed to parse Zerodha response:", responseText);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: `Failed to parse Zerodha response: ${zerodhaResponse.status}`,
+          details: responseText
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     if (!zerodhaResponse.ok) {
-      const errorData = await zerodhaResponse.text();
-      console.error(`Zerodha API error: ${zerodhaResponse.status} - ${errorData}`);
+      console.error(`Zerodha API error: ${zerodhaResponse.status} - ${JSON.stringify(responseData)}`);
       return new Response(
         JSON.stringify({ 
           success: false, 
           message: `Zerodha API error: ${zerodhaResponse.status}`,
-          details: errorData
+          details: responseData
         }),
         { status: zerodhaResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Parse response and extract access token
-    const responseData = await zerodhaResponse.json();
+    // Extract access token from response
     console.log("Zerodha response data:", JSON.stringify(responseData).substring(0, 100) + "...");
 
     if (!responseData.data || !responseData.data.access_token) {
