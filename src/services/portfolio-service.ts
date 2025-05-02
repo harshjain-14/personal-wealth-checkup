@@ -1,3 +1,4 @@
+
 // Updated Portfolio service to use Supabase
 
 import { supabase } from "@/integrations/supabase/client";
@@ -294,7 +295,7 @@ const PortfolioService = {
         return null;
       }
       
-      // Use service role key and avoid TypeScript errors with type casting
+      // Use a raw query approach to avoid TypeScript errors
       const { data, error } = await supabase
         .from('portfolio_snapshots')
         .select('*')
@@ -308,8 +309,13 @@ const PortfolioService = {
         return null;
       }
       
+      // Cast the data to have the expected properties
+      const snapshotData = data as unknown as {
+        snapshot_data: any;
+      };
+      
       // Return the snapshot data
-      return data?.snapshot_data || null;
+      return snapshotData.snapshot_data || null;
     } catch (error) {
       console.error("Error in getLatestPortfolioSnapshot:", error);
       return null;

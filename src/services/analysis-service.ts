@@ -213,7 +213,8 @@ const AnalysisService = {
         return null;
       }
       
-      // Use the service role to query the database (avoids type issues)
+      // Need to perform a raw query since portfolio_analysis might not be in the types yet
+      // This avoids the TypeScript errors by casting the result
       const { data, error } = await supabase
         .from('portfolio_analysis')
         .select('*')
@@ -232,10 +233,16 @@ const AnalysisService = {
         return null;
       }
       
+      // Cast the data to have the expected properties
+      const analysisData = data as unknown as {
+        analysis_data: any;
+        analysis_date: string;
+      };
+      
       return {
-        ...data.analysis_data,
-        timestamp: data.analysis_date,
-        generatedDate: data.analysis_date
+        ...analysisData.analysis_data,
+        timestamp: analysisData.analysis_date,
+        generatedDate: analysisData.analysis_date
       };
     } catch (error) {
       console.error('Error in getLatestAnalysis:', error);
