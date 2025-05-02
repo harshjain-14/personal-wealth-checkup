@@ -20,6 +20,7 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
+  const [portfolioViewed, setPortfolioViewed] = useState(false);
   
   useEffect(() => {
     // Check if user is already connected to Zerodha on component mount
@@ -60,7 +61,7 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
         if (success) {
           toast.success('Connected to Zerodha successfully');
           setIsConnected(true);
-          onConnect();
+          setPortfolioViewed(false); // Reset when reconnected
         } else {
           const errorMessage = 'Failed to connect to Zerodha. Please try again.';
           setError(errorMessage);
@@ -81,7 +82,7 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
       setIsLoading(false);
       toast.error(`Zerodha login error: ${event.data.error}`);
     }
-  }, [onConnect]);
+  }, []);
 
   // Set up event listener for popup message
   useEffect(() => {
@@ -148,6 +149,15 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
     }
   };
 
+  const handleViewPortfolio = () => {
+    setPortfolioViewed(true);
+    onConnect();
+  };
+  
+  const handleBackToOptions = () => {
+    setPortfolioViewed(false);
+  };
+
   const handleLogoutZerodha = async () => {
     setIsLogoutLoading(true);
     try {
@@ -155,6 +165,7 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
       if (success) {
         toast.success('Disconnected from Zerodha successfully');
         setIsConnected(false);
+        setPortfolioViewed(false);
       } else {
         toast.error('Failed to disconnect from Zerodha');
       }
@@ -222,31 +233,43 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
         <CardFooter className="flex flex-col space-y-3">
           {isConnected ? (
             <div className="w-full space-y-3">
-              <Button 
-                onClick={onConnect}
-                className="w-full bg-finance-blue hover:bg-finance-blue/90"
-              >
-                View Portfolio
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-              <Button 
-                onClick={handleLogoutZerodha}
-                variant="outline"
-                className="w-full border-gray-300 hover:bg-gray-100"
-                disabled={isLogoutLoading}
-              >
-                {isLogoutLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Disconnecting...
-                  </>
-                ) : (
-                  <>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Disconnect Zerodha Account
-                  </>
-                )}
-              </Button>
+              {!portfolioViewed ? (
+                <>
+                  <Button 
+                    onClick={handleViewPortfolio}
+                    className="w-full bg-finance-blue hover:bg-finance-blue/90"
+                  >
+                    View Portfolio
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                  <Button 
+                    onClick={handleLogoutZerodha}
+                    variant="outline"
+                    className="w-full border-gray-300 hover:bg-gray-100"
+                    disabled={isLogoutLoading}
+                  >
+                    {isLogoutLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Disconnecting...
+                      </>
+                    ) : (
+                      <>
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Disconnect Zerodha Account
+                      </>
+                    )}
+                  </Button>
+                </>
+              ) : (
+                <Button 
+                  onClick={handleBackToOptions}
+                  variant="outline"
+                  className="w-full border-gray-300 hover:bg-gray-100"
+                >
+                  Back to Connection Options
+                </Button>
+              )}
             </div>
           ) : (
             <Button 

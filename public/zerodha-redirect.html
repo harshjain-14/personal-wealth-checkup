@@ -61,6 +61,20 @@
             margin-top: 2rem;
             color: #666;
         }
+        .button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 1rem;
+            display: none;
+        }
+        .button:hover {
+            background-color: #3e8e41;
+        }
     </style>
 </head>
 <body>
@@ -70,7 +84,8 @@
         <p class="message" id="message">Securely connecting your portfolio data. Please wait...</p>
         <p class="error" id="error" style="display: none;"></p>
         <p class="success" id="success" style="display: none;">Connection successful! You will be redirected automatically.</p>
-        <p class="closing" id="closing" style="display: none;">This window will close in <span id="countdown">3</span> seconds.</p>
+        <p class="closing" id="closing" style="display: none;">This window will close in <span id="countdown">5</span> seconds.</p>
+        <button class="button" id="closeButton" onclick="closeWindow()">Close Window Now</button>
     </div>
 
     <script>
@@ -87,6 +102,7 @@
                 document.getElementById('error').textContent = error || 'Authentication failed';
                 document.getElementById('message').textContent = 'Please close this window and try again.';
                 document.getElementById('closing').style.display = 'block';
+                document.getElementById('closeButton').style.display = 'inline-block';
                 
                 // Send error message to parent window
                 if (window.opener && !window.opener.closed) {
@@ -105,6 +121,7 @@
                 document.getElementById('error').textContent = 'No request token found in URL';
                 document.getElementById('message').textContent = 'Please close this window and try again.';
                 document.getElementById('closing').style.display = 'block';
+                document.getElementById('closeButton').style.display = 'inline-block';
                 
                 // Send error message to parent window
                 if (window.opener && !window.opener.closed) {
@@ -122,6 +139,7 @@
                 document.getElementById('message').style.display = 'none';
                 document.getElementById('success').style.display = 'block';
                 document.getElementById('closing').style.display = 'block';
+                document.getElementById('closeButton').style.display = 'inline-block';
                 
                 // Start countdown to close
                 startCountdown();
@@ -130,11 +148,16 @@
                 document.getElementById('error').style.display = 'block';
                 document.getElementById('error').textContent = 'Parent window closed or not available';
                 document.getElementById('message').textContent = 'Please close this window and try again.';
+                document.getElementById('closeButton').style.display = 'inline-block';
             }
         });
         
+        function closeWindow() {
+            window.close();
+        }
+        
         function startCountdown() {
-            let count = 3;
+            let count = 5;
             const countdownElement = document.getElementById('countdown');
             
             const interval = setInterval(() => {

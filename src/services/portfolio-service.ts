@@ -294,7 +294,7 @@ const PortfolioService = {
         return null;
       }
       
-      // Use a TypeScript type assertion to work around the type checking limitation
+      // Fix the TypeScript error by using type assertion
       const { data, error } = await supabase
         .from('portfolio_snapshots' as any)
         .select('*')
@@ -308,6 +308,7 @@ const PortfolioService = {
         return null;
       }
       
+      // Use optional chaining to safely access the snapshot_data property
       return data?.snapshot_data || null;
     } catch (error) {
       console.error("Error in getLatestPortfolioSnapshot:", error);
