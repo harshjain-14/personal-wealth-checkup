@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardDescription, CardFooter, CardTitle } from '@/components/ui/card';
@@ -34,11 +35,16 @@ const DataEntryTabs = ({ portfolioData, onDataSaved, onAnalysisRequest }: DataEn
   const handleZerodhaConnect = async () => {
     try {
       const zerodhaData = await PortfolioService.getZerodhaPortfolio();
-      const updatedData = await PortfolioService.savePortfolioData({
+      // Create a new portfolio data object with zerodha data and existing data
+      const updatedPortfolioData: PortfolioData = {
+        ...portfolioData,
         stocks: zerodhaData.stocks,
-        mutualFunds: zerodhaData.mutualFunds
-      });
-      onDataSaved(updatedData);
+        mutualFunds: zerodhaData.mutualFunds,
+        lastUpdated: new Date().toISOString()
+      };
+      
+      const savedData = await PortfolioService.savePortfolioData(updatedPortfolioData);
+      onDataSaved(savedData);
       setZerodhaConnected(true);
       setActiveTab('external');
       toast.success('Zerodha portfolio data imported successfully');

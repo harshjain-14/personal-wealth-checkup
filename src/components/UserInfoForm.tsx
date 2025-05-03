@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { UserInfo } from '@/services/portfolio-service';
+import { UserInfo, CityType, RiskTolerance } from '@/services/portfolio-service';
 import { Database } from '@/integrations/supabase/types';
 
 interface UserInfoFormProps {
@@ -20,9 +20,9 @@ interface UserInfoFormProps {
   onSave: (userInfo: UserInfo) => void;
 }
 
-// Indian major cities using the exact values from the database enum
-type CityEnum = Database["public"]["Enums"]["city_enum"];
-const MAJOR_CITIES: CityEnum[] = [
+// City mapping for UI display
+type CityDisplayType = 'Mumbai' | 'Delhi' | 'Bangalore' | 'Hyderabad' | 'Chennai' | 'Kolkata' | 'Pune' | 'Ahmedabad' | 'Jaipur' | 'Lucknow' | 'Other';
+const MAJOR_CITIES: CityDisplayType[] = [
   'Mumbai',
   'Delhi',
   'Bangalore',
@@ -36,7 +36,44 @@ const MAJOR_CITIES: CityEnum[] = [
   'Other'
 ];
 
-const RISK_TOLERANCE_OPTIONS: { value: UserInfo['riskTolerance']; label: string }[] = [
+// Map frontend display values to database enum values
+const cityToDbMap: Record<CityDisplayType, CityType> = {
+  'Mumbai': 'metro',
+  'Delhi': 'metro',
+  'Bangalore': 'metro',
+  'Hyderabad': 'tier1',
+  'Chennai': 'tier1',
+  'Kolkata': 'tier1',
+  'Pune': 'tier1',
+  'Ahmedabad': 'tier2',
+  'Jaipur': 'tier2',
+  'Lucknow': 'tier3',
+  'Other': 'overseas'
+};
+
+const dbToCityMap: Record<CityType, CityDisplayType> = {
+  'metro': 'Mumbai',
+  'tier1': 'Chennai',
+  'tier2': 'Ahmedabad',
+  'tier3': 'Lucknow',
+  'overseas': 'Other'
+};
+
+// Risk tolerance mapping
+type RiskDisplayType = 'low' | 'medium' | 'high';
+const riskToDbMap: Record<RiskDisplayType, RiskTolerance> = {
+  'low': 'conservative',
+  'medium': 'moderate',
+  'high': 'aggressive'
+};
+
+const dbToRiskMap: Record<RiskTolerance, RiskDisplayType> = {
+  'conservative': 'low',
+  'moderate': 'medium',
+  'aggressive': 'high'
+};
+
+const RISK_TOLERANCE_OPTIONS: { value: RiskDisplayType; label: string }[] = [
   { value: 'low', label: 'Low - Safety First' },
   { value: 'medium', label: 'Medium - Balanced Approach' },
   { value: 'high', label: 'High - Growth Focused' }
@@ -55,10 +92,15 @@ const FINANCIAL_GOALS = [
 ];
 
 const UserInfoForm = ({ userInfo, onSave }: UserInfoFormProps) => {
-  const [formData, setFormData] = useState<UserInfo>({
+  const [formData, setFormData] = useState<{
+    age: number;
+    city: CityDisplayType;
+    riskTolerance: RiskDisplayType;
+    financialGoals: string[];
+  }>({
     age: userInfo?.age || 0,
-    city: (userInfo?.city as CityEnum) || 'Mumbai',
-    riskTolerance: userInfo?.riskTolerance || 'medium',
+    city: userInfo?.city ? dbToCityMap[userInfo.city] : 'Mumbai',
+    riskTolerance: userInfo?.riskTolerance ? dbToRiskMap[userInfo.riskTolerance] : 'medium',
     financialGoals: userInfo?.financialGoals || []
   });
   const [otherCity, setOtherCity] = useState('');
@@ -67,8 +109,10 @@ const UserInfoForm = ({ userInfo, onSave }: UserInfoFormProps) => {
   useEffect(() => {
     if (userInfo) {
       setFormData({
-        ...userInfo,
-        city: userInfo.city as CityEnum
+        age: userInfo.age,
+        city: userInfo.city ? dbToCityMap[userInfo.city] : 'Mumbai',
+        riskTolerance: userInfo.riskTolerance ? dbToRiskMap[userInfo.riskTolerance] : 'medium',
+        financialGoals: userInfo.financialGoals || []
       });
       setSelectedGoals(userInfo.financialGoals || []);
     }
@@ -93,13 +137,15 @@ const UserInfoForm = ({ userInfo, onSave }: UserInfoFormProps) => {
       return;
     }
 
-    const finalCity = formData.city === 'Other' && otherCity ? otherCity as CityEnum : formData.city;
+    const mappedCity = formData.city === 'Other' && otherCity ? 'overseas' : cityToDbMap[formData.city];
+    const mappedRiskTolerance = riskToDbMap[formData.riskTolerance];
     
     console.log("DEBUG - Submitting user info with financial goals:", selectedGoals);
     
     onSave({
-      ...formData,
-      city: finalCity,
+      age: formData.age,
+      city: mappedCity,
+      riskTolerance: mappedRiskTolerance,
       financialGoals: selectedGoals
     });
   };
@@ -136,7 +182,7 @@ const UserInfoForm = ({ userInfo, onSave }: UserInfoFormProps) => {
               <Label htmlFor="city">City</Label>
               <Select 
                 value={formData.city} 
-                onValueChange={(value: CityEnum) => setFormData({...formData, city: value})}
+                onValueChange={(value: CityDisplayType) => setFormData({...formData, city: value})}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select city" />
@@ -163,7 +209,7 @@ const UserInfoForm = ({ userInfo, onSave }: UserInfoFormProps) => {
             <Label htmlFor="riskTolerance">Investment Risk Tolerance</Label>
             <Select 
               value={formData.riskTolerance} 
-              onValueChange={(value: UserInfo['riskTolerance']) => 
+              onValueChange={(value: RiskDisplayType) => 
                 setFormData({...formData, riskTolerance: value})
               }
             >

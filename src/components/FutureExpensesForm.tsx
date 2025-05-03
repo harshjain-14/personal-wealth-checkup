@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { FutureExpense } from '@/services/portfolio-service';
+import { FutureExpense, FuturePurpose, TimeFrame, PriorityLevel } from '@/services/portfolio-service';
 import { Trash2 } from 'lucide-react';
 
 interface FutureExpensesFormProps {
@@ -20,8 +20,9 @@ interface FutureExpensesFormProps {
   onSave: (futureExpenses: FutureExpense[]) => void;
 }
 
-// IMPORTANT: These values must match EXACTLY what's in the database enum (from the screenshot)
-const COMMON_FUTURE_EXPENSES = [
+// UI display values - these are what users see and select
+type PurposeDisplayType = 'House Purchase' | 'Car Purchase' | 'Education' | 'Wedding' | 'Medical Treatment' | 'Vacation' | 'Home Renovation' | 'Business Startup' | 'Other';
+const COMMON_FUTURE_EXPENSES: PurposeDisplayType[] = [
   'House Purchase',
   'Car Purchase',
   'Education',
@@ -33,13 +34,31 @@ const COMMON_FUTURE_EXPENSES = [
   'Other'
 ];
 
-const PRIORITY_OPTIONS: { value: FutureExpense['priority']; label: string }[] = [
-  { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'high', label: 'High' }
-];
+const purposeToDbMap: Record<PurposeDisplayType, FuturePurpose> = {
+  'House Purchase': 'home',
+  'Car Purchase': 'vehicle',
+  'Education': 'education',
+  'Wedding': 'wedding',
+  'Medical Treatment': 'healthcare',
+  'Vacation': 'vacation',
+  'Home Renovation': 'home',
+  'Business Startup': 'others',
+  'Other': 'others'
+};
 
-const TIMEFRAME_OPTIONS = [
+const dbToPurposeMap: Record<string, PurposeDisplayType> = {
+  'home': 'House Purchase',
+  'vehicle': 'Car Purchase',
+  'education': 'Education',
+  'wedding': 'Wedding',
+  'healthcare': 'Medical Treatment',
+  'vacation': 'Vacation',
+  'others': 'Other'
+};
+
+// UI for timeframe
+type TimeFrameDisplayType = '3 months' | '6 months' | '1 year' | '2 years' | '5 years' | '10 years' | 'Other';
+const TIMEFRAME_OPTIONS: TimeFrameDisplayType[] = [
   '3 months',
   '6 months',
   '1 year',
@@ -49,37 +68,89 @@ const TIMEFRAME_OPTIONS = [
   'Other'
 ];
 
+const timeframeToDbMap: Record<TimeFrameDisplayType, TimeFrame> = {
+  '3 months': 'short_term',
+  '6 months': 'short_term',
+  '1 year': 'short_term',
+  '2 years': 'medium_term',
+  '5 years': 'medium_term',
+  '10 years': 'long_term',
+  'Other': 'medium_term'
+};
+
+const PRIORITY_OPTIONS: { value: PriorityLevel; label: string }[] = [
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' }
+];
+
+interface UiFormExpense {
+  purpose: PurposeDisplayType;
+  amount: number;
+  timeframe: TimeFrameDisplayType;
+  priority: PriorityLevel;
+  notes?: string;
+  id?: number;
+}
+
+const mapDbToUiExpense = (expense: FutureExpense): UiFormExpense => {
+  const purposeDisplay = dbToPurposeMap[expense.purpose] || 'Other';
+  // For timeframe, we'll use a general mapping based on the term
+  let timeframeDisplay: TimeFrameDisplayType = 'Other';
+  if (expense.timeframe === 'short_term') timeframeDisplay = '1 year';
+  else if (expense.timeframe === 'medium_term') timeframeDisplay = '5 years';
+  else if (expense.timeframe === 'long_term') timeframeDisplay = '10 years';
+  
+  return {
+    purpose: purposeDisplay,
+    amount: expense.amount,
+    timeframe: timeframeDisplay,
+    priority: expense.priority,
+    notes: expense.notes,
+    id: expense.id
+  };
+};
+
+const mapUiToDbExpense = (uiExpense: UiFormExpense, customTimeframe?: string): FutureExpense => {
+  return {
+    purpose: purposeToDbMap[uiExpense.purpose],
+    amount: uiExpense.amount,
+    timeframe: uiExpense.timeframe === 'Other' && customTimeframe 
+      ? 'medium_term' // Default for custom timeframe
+      : timeframeToDbMap[uiExpense.timeframe],
+    priority: uiExpense.priority,
+    notes: uiExpense.notes,
+    id: uiExpense.id
+  };
+};
+
 const FutureExpensesForm = ({ futureExpenses, onSave }: FutureExpensesFormProps) => {
   const [futureExpensesList, setFutureExpensesList] = useState<FutureExpense[]>(futureExpenses || []);
-  const [newExpense, setNewExpense] = useState<FutureExpense>({
-    purpose: '',
+  const [newExpense, setNewExpense] = useState<UiFormExpense>({
+    purpose: 'House Purchase',
     amount: 0,
-    timeframe: '',
+    timeframe: '5 years',
     priority: 'medium',
     notes: ''
   });
   const [customTimeframe, setCustomTimeframe] = useState('');
 
   const handleAddExpense = () => {
-    if (!newExpense.purpose || !newExpense.amount || newExpense.amount <= 0 || (!newExpense.timeframe && !customTimeframe)) {
+    if (!newExpense.purpose || !newExpense.amount || newExpense.amount <= 0 || !newExpense.timeframe) {
       toast.error('Please fill all required fields with valid values');
       return;
     }
 
-    const finalTimeframe = newExpense.timeframe === 'Other' ? customTimeframe : newExpense.timeframe;
+    const dbExpense = mapUiToDbExpense(newExpense, customTimeframe);
     
     console.log("Adding expense with purpose:", newExpense.purpose); // Debug logging
     
-    setFutureExpensesList([...futureExpensesList, { 
-      ...newExpense, 
-      timeframe: finalTimeframe,
-      amount: Number(newExpense.amount) 
-    }]);
+    setFutureExpensesList([...futureExpensesList, dbExpense]);
     
     setNewExpense({
-      purpose: '',
+      purpose: 'House Purchase',
       amount: 0,
-      timeframe: '',
+      timeframe: '5 years',
       priority: 'medium',
       notes: ''
     });
@@ -116,38 +187,41 @@ const FutureExpensesForm = ({ futureExpenses, onSave }: FutureExpensesFormProps)
             <div className="space-y-4">
               <h3 className="text-sm font-medium">Planned Future Expenses</h3>
               <div className="space-y-2">
-                {futureExpensesList.map((expense, index) => (
-                  <div 
-                    key={index} 
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
-                  >
-                    <div>
-                      <p className="font-medium">{expense.purpose}</p>
-                      <div className="flex text-xs text-gray-500 space-x-2">
-                        <span>₹{expense.amount.toLocaleString()}</span>
-                        <span>•</span>
-                        <span>In {expense.timeframe}</span>
-                        <span>•</span>
-                        <span className="capitalize">
-                          {expense.priority === 'high' ? (
-                            <span className="text-finance-red">{expense.priority} priority</span>
-                          ) : expense.priority === 'medium' ? (
-                            <span className="text-amber-500">{expense.priority} priority</span>
-                          ) : (
-                            <span>{expense.priority} priority</span>
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => handleRemoveExpense(index)}
+                {futureExpensesList.map((expense, index) => {
+                  const uiExpense = mapDbToUiExpense(expense);
+                  return (
+                    <div 
+                      key={index} 
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
                     >
-                      <Trash2 className="h-4 w-4 text-finance-red" />
-                    </Button>
-                  </div>
-                ))}
+                      <div>
+                        <p className="font-medium">{uiExpense.purpose}</p>
+                        <div className="flex text-xs text-gray-500 space-x-2">
+                          <span>₹{expense.amount.toLocaleString()}</span>
+                          <span>•</span>
+                          <span>In {uiExpense.timeframe}</span>
+                          <span>•</span>
+                          <span className="capitalize">
+                            {expense.priority === 'high' ? (
+                              <span className="text-finance-red">{expense.priority} priority</span>
+                            ) : expense.priority === 'medium' ? (
+                              <span className="text-amber-500">{expense.priority} priority</span>
+                            ) : (
+                              <span>{expense.priority} priority</span>
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => handleRemoveExpense(index)}
+                      >
+                        <Trash2 className="h-4 w-4 text-finance-red" />
+                      </Button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -162,7 +236,7 @@ const FutureExpensesForm = ({ futureExpenses, onSave }: FutureExpensesFormProps)
                   <Label htmlFor="expensePurpose">Purpose</Label>
                   <Select 
                     value={newExpense.purpose} 
-                    onValueChange={(value) => setNewExpense({...newExpense, purpose: value})}
+                    onValueChange={(value: PurposeDisplayType) => setNewExpense({...newExpense, purpose: value})}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select purpose" />
@@ -196,7 +270,7 @@ const FutureExpensesForm = ({ futureExpenses, onSave }: FutureExpensesFormProps)
                   <Label htmlFor="expenseTimeframe">Timeframe</Label>
                   <Select 
                     value={newExpense.timeframe} 
-                    onValueChange={(value) => setNewExpense({...newExpense, timeframe: value})}
+                    onValueChange={(value: TimeFrameDisplayType) => setNewExpense({...newExpense, timeframe: value})}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="When needed" />
@@ -222,7 +296,7 @@ const FutureExpensesForm = ({ futureExpenses, onSave }: FutureExpensesFormProps)
                   <Label htmlFor="expensePriority">Priority</Label>
                   <Select 
                     value={newExpense.priority} 
-                    onValueChange={(value: FutureExpense['priority']) => setNewExpense({...newExpense, priority: value})}
+                    onValueChange={(value: PriorityLevel) => setNewExpense({...newExpense, priority: value})}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select priority" />

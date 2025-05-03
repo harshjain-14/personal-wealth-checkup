@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { ExternalInvestment } from '@/services/portfolio-service';
+import { ExternalInvestment, InvestmentType } from '@/services/portfolio-service';
 import { Trash2 } from 'lucide-react';
 
 interface ExternalInvestmentsFormProps {
@@ -20,7 +20,7 @@ interface ExternalInvestmentsFormProps {
   onSave: (investments: ExternalInvestment[]) => void;
 }
 
-const INVESTMENT_TYPES = [
+const INVESTMENT_TYPES: InvestmentType[] = [
   'Gold',
   'Fixed Deposit',
   'Real Estate',
@@ -35,7 +35,7 @@ const INVESTMENT_TYPES = [
 const ExternalInvestmentsForm = ({ investments, onSave }: ExternalInvestmentsFormProps) => {
   const [investmentsList, setInvestmentsList] = useState<ExternalInvestment[]>(investments || []);
   const [newInvestment, setNewInvestment] = useState<ExternalInvestment>({
-    type: '',
+    type: 'Fixed Deposit',
     name: '',
     amount: 0,
     notes: ''
@@ -54,7 +54,7 @@ const ExternalInvestmentsForm = ({ investments, onSave }: ExternalInvestmentsFor
 
     setInvestmentsList([...investmentsList, { ...newInvestment, amount: Number(newInvestment.amount) }]);
     setNewInvestment({
-      type: '',
+      type: 'Fixed Deposit',
       name: '',
       amount: 0,
       notes: ''
@@ -126,7 +126,7 @@ const ExternalInvestmentsForm = ({ investments, onSave }: ExternalInvestmentsFor
                   <Label htmlFor="investmentType">Type</Label>
                   <Select 
                     value={newInvestment.type} 
-                    onValueChange={(value) => setNewInvestment({...newInvestment, type: value})}
+                    onValueChange={(value: InvestmentType) => setNewInvestment({...newInvestment, type: value})}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select type" />

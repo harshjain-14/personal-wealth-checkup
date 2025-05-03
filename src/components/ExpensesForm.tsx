@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Expense } from '@/services/portfolio-service';
+import { Expense, ExpenseFrequency, ExpenseType } from '@/services/portfolio-service';
 import { Trash2 } from 'lucide-react';
 
 interface ExpensesFormProps {
@@ -31,7 +31,7 @@ const EXPENSE_TYPES = [
   'Others'
 ];
 
-const FREQUENCY_OPTIONS: { value: Expense['frequency']; label: string }[] = [
+const FREQUENCY_OPTIONS: { value: ExpenseFrequency; label: string }[] = [
   { value: 'monthly', label: 'Monthly' },
   { value: 'quarterly', label: 'Quarterly' },
   { value: 'yearly', label: 'Yearly' },
@@ -41,7 +41,7 @@ const FREQUENCY_OPTIONS: { value: Expense['frequency']; label: string }[] = [
 const ExpensesForm = ({ expenses, onSave }: ExpensesFormProps) => {
   const [expensesList, setExpensesList] = useState<Expense[]>(expenses || []);
   const [newExpense, setNewExpense] = useState<Expense>({
-    type: '',
+    type: EXPENSE_TYPES[0],
     name: '',
     amount: 0,
     frequency: 'monthly',
@@ -61,7 +61,7 @@ const ExpensesForm = ({ expenses, onSave }: ExpensesFormProps) => {
 
     setExpensesList([...expensesList, { ...newExpense, amount: Number(newExpense.amount) }]);
     setNewExpense({
-      type: '',
+      type: EXPENSE_TYPES[0],
       name: '',
       amount: 0,
       frequency: 'monthly',
@@ -180,7 +180,7 @@ const ExpensesForm = ({ expenses, onSave }: ExpensesFormProps) => {
                   <Label htmlFor="expenseFrequency">Frequency</Label>
                   <Select 
                     value={newExpense.frequency} 
-                    onValueChange={(value: Expense['frequency']) => setNewExpense({...newExpense, frequency: value})}
+                    onValueChange={(value: ExpenseFrequency) => setNewExpense({...newExpense, frequency: value})}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select frequency" />

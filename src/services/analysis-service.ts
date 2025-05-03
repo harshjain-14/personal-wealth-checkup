@@ -25,6 +25,8 @@ export interface AssetAllocationItem {
   value: number;
 }
 
+export type AssetAllocation = AssetAllocationItem[];
+
 export interface RiskMetrics {
   volatility: {
     portfolioBeta: number;
@@ -54,7 +56,7 @@ export interface PortfolioInsight {
 // Define the structure of the analysis report
 export interface AnalysisReport {
   summary: string;
-  assetAllocation: AssetAllocationItem[];
+  assetAllocation: AssetAllocation;
   performanceMetrics: PerformanceMetrics;
   sectorBreakdown: SectorBreakdown[];
   riskMetrics: RiskMetrics;
@@ -213,11 +215,9 @@ const AnalysisService = {
         return null;
       }
       
-      // Use a raw SQL query approach to avoid TypeScript errors
-      // This is because the portfolio_analysis table might not be in the types yet
+      // Use the stored procedure to fetch the latest analysis
       const { data, error } = await supabase
-        .rpc('get_latest_analysis')
-        .single();
+        .rpc('get_latest_analysis');
         
       if (error) {
         console.error('Error fetching latest analysis:', error);

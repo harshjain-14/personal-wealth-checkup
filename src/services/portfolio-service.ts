@@ -3,8 +3,9 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from 'sonner';
+import { Database } from '@/integrations/supabase/types';
 
-// Define types for portfolio data
+// Define types for portfolio data aligned with database schema
 export interface Stock {
   id?: number;
   symbol: string;
@@ -25,37 +26,49 @@ export interface MutualFund {
   units?: number;
 }
 
+// Updated to match the database enum types
+export type InvestmentType = Database["public"]["Enums"]["investment_type"];
 export interface ExternalInvestment {
   id?: number;
   name: string;
-  type: 'Gold' | 'Fixed Deposit' | 'Real Estate' | 'Insurance' | 'EPF/PPF' | 'Bonds' | 'Crypto' | 'Others';
+  type: InvestmentType;
   amount: number;
   notes?: string;
 }
 
-export interface RegularExpense {
+export type ExpenseFrequency = 'monthly' | 'quarterly' | 'yearly' | 'one-time';
+export type ExpenseType = 'essential' | 'discretionary' | 'investment' | 'debt' | 'healthcare' | 'education' | 'others';
+
+export interface Expense {
   id?: number;
-  description: string;
+  name: string;
+  type: string;
   amount: number;
-  frequency: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
-  expense_type: 'essential' | 'discretionary' | 'investment' | 'debt' | 'healthcare' | 'education' | 'others';
+  frequency: ExpenseFrequency;
   notes?: string;
 }
+
+export type FuturePurpose = 'home' | 'education' | 'vehicle' | 'vacation' | 'wedding' | 'healthcare' | 'others';
+export type TimeFrame = 'short_term' | 'medium_term' | 'long_term';
+export type PriorityLevel = 'low' | 'medium' | 'high';
 
 export interface FutureExpense {
   id?: number;
-  purpose: 'home' | 'education' | 'vehicle' | 'vacation' | 'wedding' | 'healthcare' | 'others';
+  purpose: FuturePurpose;
   amount: number;
-  timeframe: 'short_term' | 'medium_term' | 'long_term';
-  priority: 'low' | 'medium' | 'high';
+  timeframe: TimeFrame;
+  priority: PriorityLevel;
   notes?: string;
 }
+
+export type RiskTolerance = 'conservative' | 'moderate' | 'aggressive';
+export type CityType = 'metro' | 'tier1' | 'tier2' | 'tier3' | 'overseas';
 
 export interface UserInfo {
   id?: string;
   age: number;
-  city: 'metro' | 'tier1' | 'tier2' | 'tier3' | 'overseas';
-  riskTolerance: 'conservative' | 'moderate' | 'aggressive';
+  city: CityType;
+  riskTolerance: RiskTolerance;
   financialGoals?: string[];
 }
 
@@ -83,12 +96,39 @@ export interface PortfolioData {
   stocks: Stock[];
   mutualFunds: MutualFund[];
   externalInvestments: ExternalInvestment[];
-  expenses: RegularExpense[];
+  expenses: Expense[];
   futureExpenses: FutureExpense[];
   userInfo?: UserInfo;
   lastUpdated: string;
   zerodhaHoldings?: ZerodhaHolding[];
 }
+
+// Helper function for mapping enum values
+const mapCityToDbEnum = (city: string): CityType => {
+  const cityMap: Record<string, CityType> = {
+    'Mumbai': 'metro',
+    'Delhi': 'metro',
+    'Bangalore': 'metro',
+    'Hyderabad': 'tier1',
+    'Chennai': 'tier1',
+    'Kolkata': 'tier1',
+    'Pune': 'tier1',
+    'Ahmedabad': 'tier2',
+    'Jaipur': 'tier2',
+    'Lucknow': 'tier3',
+    'Other': 'overseas'
+  };
+  return cityMap[city] || 'overseas';
+};
+
+const mapRiskToleranceToDbEnum = (risk: string): RiskTolerance => {
+  const riskMap: Record<string, RiskTolerance> = {
+    'low': 'conservative',
+    'medium': 'moderate',
+    'high': 'aggressive'
+  };
+  return riskMap[risk] || 'moderate';
+};
 
 const PortfolioService = {
   // Save portfolio data to Supabase
@@ -174,18 +214,18 @@ const PortfolioService = {
       
       // Insert new investments
       if (investments.length > 0) {
+        // Map to valid investment types if needed
+        const mappedInvestments = investments.map((inv, index) => ({
+          user_id: user.id,
+          investment_name: inv.name,
+          investment_type: inv.type,
+          amount: inv.amount,
+          notes: inv.notes
+        }));
+        
         const { error } = await supabase
           .from('external_investments')
-          .insert(
-            investments.map((inv, index) => ({
-              id: index + 1,
-              user_id: user.id,
-              investment_name: inv.name,
-              investment_type: inv.type,
-              amount: inv.amount,
-              notes: inv.notes
-            }))
-          );
+          .insert(mappedInvestments);
           
         if (error) {
           console.error('Error saving external investments:', error);
@@ -234,7 +274,7 @@ const PortfolioService = {
   },
   
   // Save regular expenses
-  saveRegularExpenses: async (expenses: RegularExpense[]): Promise<RegularExpense[]> => {
+  saveExpenses: async (expenses: Expense[]): Promise<Expense[]> => {
     try {
       const user = (await supabase.auth.getUser()).data.user;
       if (!user) {
@@ -250,18 +290,18 @@ const PortfolioService = {
       
       // Insert new expenses
       if (expenses.length > 0) {
+        const mappedExpenses = expenses.map(exp => ({
+          user_id: user.id,
+          description: exp.name,
+          amount: exp.amount,
+          frequency: exp.frequency,
+          expense_type: exp.type as ExpenseType,
+          notes: exp.notes
+        }));
+        
         const { error } = await supabase
           .from('regular_expenses')
-          .insert(
-            expenses.map(exp => ({
-              user_id: user.id,
-              description: exp.description,
-              amount: exp.amount,
-              frequency: exp.frequency,
-              expense_type: exp.expense_type,
-              notes: exp.notes
-            }))
-          );
+          .insert(mappedExpenses);
           
         if (error) {
           console.error('Error saving regular expenses:', error);
@@ -279,7 +319,7 @@ const PortfolioService = {
   },
   
   // Fetch regular expenses
-  getRegularExpenses: async (): Promise<RegularExpense[]> => {
+  getExpenses: async (): Promise<Expense[]> => {
     try {
       const user = (await supabase.auth.getUser()).data.user;
       if (!user) {
@@ -296,7 +336,14 @@ const PortfolioService = {
         return [];
       }
       
-      return data;
+      return data.map(exp => ({
+        id: exp.id,
+        name: exp.description,
+        type: exp.expense_type,
+        amount: exp.amount,
+        frequency: exp.frequency as ExpenseFrequency,
+        notes: exp.notes
+      }));
     } catch (error) {
       console.error('Error fetching regular expenses:', error);
       return [];
@@ -320,18 +367,18 @@ const PortfolioService = {
       
       // Insert new future expenses
       if (expenses.length > 0) {
+        const mappedExpenses = expenses.map(exp => ({
+          user_id: user.id,
+          purpose: exp.purpose,
+          amount: exp.amount,
+          timeframe: exp.timeframe,
+          priority: exp.priority,
+          notes: exp.notes
+        }));
+        
         const { error } = await supabase
           .from('future_expenses')
-          .insert(
-            expenses.map(exp => ({
-              user_id: user.id,
-              purpose: exp.purpose,
-              amount: exp.amount,
-              timeframe: exp.timeframe,
-              priority: exp.priority,
-              notes: exp.notes
-            }))
-          );
+          .insert(mappedExpenses);
           
         if (error) {
           console.error('Error saving future expenses:', error);
@@ -366,7 +413,14 @@ const PortfolioService = {
         return [];
       }
       
-      return data;
+      return data.map(exp => ({
+        id: exp.id,
+        purpose: exp.purpose as FuturePurpose,
+        amount: exp.amount,
+        timeframe: exp.timeframe as TimeFrame,
+        priority: exp.priority as PriorityLevel,
+        notes: exp.notes
+      }));
     } catch (error) {
       console.error('Error fetching future expenses:', error);
       return [];
@@ -382,6 +436,13 @@ const PortfolioService = {
         throw new Error('User not logged in');
       }
       
+      // Map UI values to database enums
+      const city = typeof userInfo.city === 'string' ? 
+        mapCityToDbEnum(userInfo.city as string) : userInfo.city;
+        
+      const riskTolerance = typeof userInfo.riskTolerance === 'string' ?
+        mapRiskToleranceToDbEnum(userInfo.riskTolerance as string) : userInfo.riskTolerance;
+      
       // Check if user info exists
       const { data: existingData } = await supabase
         .from('personal_info')
@@ -395,8 +456,8 @@ const PortfolioService = {
           .from('personal_info')
           .update({
             age: userInfo.age,
-            city: userInfo.city,
-            risk_tolerance: userInfo.riskTolerance,
+            city: city,
+            risk_tolerance: riskTolerance,
             financial_goals: userInfo.financialGoals || []
           })
           .eq('user_id', user.id);
@@ -414,8 +475,8 @@ const PortfolioService = {
             id: crypto.randomUUID(),
             user_id: user.id,
             age: userInfo.age,
-            city: userInfo.city,
-            risk_tolerance: userInfo.riskTolerance,
+            city: city,
+            risk_tolerance: riskTolerance,
             financial_goals: userInfo.financialGoals || []
           });
           
@@ -500,7 +561,7 @@ const PortfolioService = {
         return null;
       }
       
-      // Use a raw query approach to avoid TypeScript errors
+      // Use the stored function
       const { data, error } = await supabase
         .rpc('get_latest_portfolio_snapshot');
       
@@ -514,6 +575,106 @@ const PortfolioService = {
     } catch (error) {
       console.error("Error in getLatestPortfolioSnapshot:", error);
       return null;
+    }
+  },
+  
+  // Zerodha portfolio integration methods
+  getZerodhaLoginUrl: async (): Promise<string | null> => {
+    try {
+      const { data, error } = await supabase.functions.invoke('zerodha-login-url');
+      
+      if (error) {
+        console.error('Error getting Zerodha login URL:', error);
+        return null;
+      }
+      
+      return data?.url || null;
+    } catch (error) {
+      console.error('Error in getZerodhaLoginUrl:', error);
+      return null;
+    }
+  },
+  
+  exchangeZerodhaToken: async (requestToken: string): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase.functions.invoke('zerodha-exchange-token', {
+        body: { requestToken }
+      });
+      
+      if (error || !data?.success) {
+        console.error('Error exchanging Zerodha token:', error || data?.error);
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error in exchangeZerodhaToken:', error);
+      return false;
+    }
+  },
+  
+  logoutFromZerodha: async (): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase.functions.invoke('zerodha-logout');
+      
+      if (error || !data?.success) {
+        console.error('Error logging out from Zerodha:', error || data?.error);
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error in logoutFromZerodha:', error);
+      return false;
+    }
+  },
+  
+  getZerodhaPortfolio: async (): Promise<{ stocks: Stock[], mutualFunds: MutualFund[] }> => {
+    try {
+      const { data, error } = await supabase.functions.invoke('zerodha-portfolio');
+      
+      if (error) {
+        console.error('Error fetching Zerodha portfolio:', error);
+        throw new Error('Failed to fetch Zerodha portfolio: ' + error.message);
+      }
+      
+      if (!data) {
+        throw new Error('No data returned from Zerodha portfolio endpoint');
+      }
+      
+      // Process the holdings data into stocks and mutual funds
+      const stocks: Stock[] = [];
+      const mutualFunds: MutualFund[] = [];
+      
+      // Process holdings
+      if (data.holdings && Array.isArray(data.holdings)) {
+        data.holdings.forEach((holding: ZerodhaHolding) => {
+          // Based on some logic (e.g., exchange) determine if it's a stock or mutual fund
+          if (holding.exchange === 'NSE' || holding.exchange === 'BSE') {
+            stocks.push({
+              symbol: holding.tradingsymbol,
+              name: holding.tradingsymbol, // Zerodha doesn't provide full names
+              quantity: holding.quantity,
+              averagePrice: holding.average_price,
+              currentPrice: holding.last_price,
+              sector: 'Unknown' // Zerodha doesn't provide sector information
+            });
+          } else if (holding.tradingsymbol.includes('MF')) {
+            // This is a simplistic check - real implementation would be more sophisticated
+            mutualFunds.push({
+              name: holding.tradingsymbol,
+              investedAmount: holding.quantity * holding.average_price,
+              currentValue: holding.quantity * holding.last_price,
+              category: 'Unknown' // Zerodha doesn't provide category information
+            });
+          }
+        });
+      }
+      
+      return { stocks, mutualFunds };
+    } catch (error) {
+      console.error('Error in getZerodhaPortfolio:', error);
+      throw error;
     }
   },
   
