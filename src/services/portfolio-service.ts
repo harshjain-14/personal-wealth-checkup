@@ -26,7 +26,7 @@ export interface MutualFund {
   units?: number;
 }
 
-// Database enum types
+// Database enum types - use literal string types to match exactly what's in the database
 export type InvestmentType = 'Gold' | 'Fixed Deposit' | 'Real Estate' | 'Bank Deposit' | 'PPF' | 'EPF' | 'National Pension Scheme' | 'Bonds' | 'Others';
 
 export interface ExternalInvestment {
@@ -105,22 +105,23 @@ export interface PortfolioData {
 }
 
 // Type mapping helpers for UI to Database conversions
-const mapExpenseFrequencyForDb = (frequency: ExpenseFrequency): string => {
-  const frequencyMap: Record<ExpenseFrequency, string> = {
+const mapExpenseFrequencyForDb = (frequency: ExpenseFrequency): Database["public"]["Enums"]["expense_frequency"] => {
+  const frequencyMap: Record<ExpenseFrequency, Database["public"]["Enums"]["expense_frequency"]> = {
     'monthly': 'Monthly',
     'quarterly': 'Quarterly',
     'yearly': 'Yearly',
     'one-time': 'One-time'
   };
-  return frequencyMap[frequency] || 'Monthly';
+  return frequencyMap[frequency];
 };
 
-const mapExpenseTypeForDb = (type: ExpenseType): string => {
-  return type; // The types should match the database enum
+const mapExpenseTypeForDb = (type: ExpenseType): Database["public"]["Enums"]["expense_type"] => {
+  // The types should directly match the database enum
+  return type as Database["public"]["Enums"]["expense_type"];
 };
 
-const mapFuturePurposeForDb = (purpose: FuturePurpose): string => {
-  const purposeMap: Record<FuturePurpose, string> = {
+const mapFuturePurposeForDb = (purpose: FuturePurpose): Database["public"]["Enums"]["future_purpose"] => {
+  const purposeMap: Record<FuturePurpose, Database["public"]["Enums"]["future_purpose"]> = {
     'home': 'House Purchase',
     'education': 'Education',
     'vehicle': 'Car Purchase',
@@ -129,51 +130,51 @@ const mapFuturePurposeForDb = (purpose: FuturePurpose): string => {
     'healthcare': 'Medical Treatment',
     'others': 'Other'
   };
-  return purposeMap[purpose] || 'Other';
+  return purposeMap[purpose];
 };
 
-const mapTimeFrameForDb = (timeframe: TimeFrame): string => {
-  const timeframeMap: Record<TimeFrame, string> = {
+const mapTimeFrameForDb = (timeframe: TimeFrame): Database["public"]["Enums"]["future_timeframe"] => {
+  const timeframeMap: Record<TimeFrame, Database["public"]["Enums"]["future_timeframe"]> = {
     'short_term': '1-2 years',
     'medium_term': '3-5 years',
     'long_term': '5-10 years'
   };
-  return timeframeMap[timeframe] || '3-5 years';
+  return timeframeMap[timeframe];
 };
 
-const mapPriorityLevelForDb = (priority: PriorityLevel): string => {
-  const priorityMap: Record<PriorityLevel, string> = {
+const mapPriorityLevelForDb = (priority: PriorityLevel): Database["public"]["Enums"]["priority_level"] => {
+  const priorityMap: Record<PriorityLevel, Database["public"]["Enums"]["priority_level"]> = {
     'low': 'Low',
     'medium': 'Medium',
     'high': 'High'
   };
-  return priorityMap[priority] || 'Medium';
+  return priorityMap[priority];
 };
 
-const mapRiskToleranceForDb = (risk: RiskTolerance): string => {
-  const riskMap: Record<RiskTolerance, string> = {
+const mapRiskToleranceForDb = (risk: RiskTolerance): Database["public"]["Enums"]["risk_tolerance"] => {
+  const riskMap: Record<RiskTolerance, Database["public"]["Enums"]["risk_tolerance"]> = {
     'conservative': 'low - safety first',
     'moderate': 'medium - balanced apporach',
     'aggressive': 'high - growth focused'
   };
-  return riskMap[risk] || 'medium - balanced apporach';
+  return riskMap[risk];
 };
 
-const mapCityToDbEnum = (city: CityType): string => {
+const mapCityToDbEnum = (city: CityType): Database["public"]["Enums"]["city_type"] => {
   // For UI to DB mapping
-  const cityDisplayMap: Record<string, string> = {
+  const cityDisplayMap: Record<CityType, Database["public"]["Enums"]["city_type"]> = {
     'metro': 'Mumbai',
     'tier1': 'Chennai',
     'tier2': 'Ahmedabad', 
     'tier3': 'Lucknow',
     'overseas': 'Other'
   };
-  return cityDisplayMap[city] || 'Other';
+  return cityDisplayMap[city];
 };
 
 // For DB to UI mapping
-const mapDbCityToUiEnum = (city: string): CityType => {
-  const cityMap: Record<string, CityType> = {
+const mapDbCityToUiEnum = (city: Database["public"]["Enums"]["city_type"]): CityType => {
+  const cityMap: Record<Database["public"]["Enums"]["city_type"], CityType> = {
     'Mumbai': 'metro',
     'Delhi': 'metro',
     'Bangalore': 'metro',
@@ -186,16 +187,16 @@ const mapDbCityToUiEnum = (city: string): CityType => {
     'Lucknow': 'tier3',
     'Other': 'overseas'
   };
-  return cityMap[city] || 'overseas';
+  return cityMap[city];
 };
 
-const mapDbRiskToUiEnum = (risk: string): RiskTolerance => {
-  const riskMap: Record<string, RiskTolerance> = {
+const mapDbRiskToUiEnum = (risk: Database["public"]["Enums"]["risk_tolerance"]): RiskTolerance => {
+  const riskMap: Record<Database["public"]["Enums"]["risk_tolerance"], RiskTolerance> = {
     'low - safety first': 'conservative',
     'medium - balanced apporach': 'moderate',
     'high - growth focused': 'aggressive'
   };
-  return riskMap[risk] || 'moderate';
+  return riskMap[risk];
 };
 
 const PortfolioService = {
@@ -240,13 +241,21 @@ const PortfolioService = {
         return snapshotData;
       }
 
-      // If no snapshot, return empty portfolio structure
+      // Gather data from individual sources
+      const [externalInvestments, expenses, futureExpenses, userInfo] = await Promise.all([
+        PortfolioService.getExternalInvestments(),
+        PortfolioService.getExpenses(),
+        PortfolioService.getFutureExpenses(),
+        PortfolioService.getUserInfo()
+      ]);
+
       return {
         stocks: [],
         mutualFunds: [],
-        externalInvestments: [],
-        expenses: [],
-        futureExpenses: [],
+        externalInvestments,
+        expenses,
+        futureExpenses,
+        userInfo: userInfo || undefined,
         lastUpdated: new Date().toISOString()
       };
     } catch (error) {
@@ -296,6 +305,7 @@ const PortfolioService = {
         }
       }
       
+      console.log("Investments saved successfully");
       return investments;
     } catch (error) {
       console.error('Error saving external investments:', error);
@@ -594,11 +604,18 @@ const PortfolioService = {
         return;
       }
       
-      // Save the snapshot using RPC function
-      await supabase.rpc('save_portfolio_snapshot', {
-        p_user_id: user.id,
-        p_snapshot_data: portfolioData
-      });
+      // Use direct insert instead of RPC function
+      const { error } = await supabase
+        .from('portfolio_snapshots')
+        .insert({
+          user_id: user.id,
+          snapshot_data: portfolioData
+        });
+      
+      if (error) {
+        console.error("Error taking portfolio snapshot:", error);
+        throw error;
+      }
       
     } catch (error) {
       console.error('Error taking portfolio snapshot:', error);
@@ -613,10 +630,14 @@ const PortfolioService = {
         return null;
       }
       
-      // Use RPC function to get the latest snapshot
-      const { data, error } = await supabase.rpc('get_latest_portfolio_snapshot', {
-        p_user_id: user.id
-      });
+      // Get the latest snapshot directly
+      const { data, error } = await supabase
+        .from('portfolio_snapshots')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
       
       if (error || !data) {
         console.error("Error fetching latest portfolio snapshot:", error);
@@ -624,7 +645,7 @@ const PortfolioService = {
       }
       
       // Return the snapshot data
-      return data as PortfolioData;
+      return data.snapshot_data as PortfolioData;
     } catch (error) {
       console.error("Error in getLatestPortfolioSnapshot:", error);
       return null;
@@ -661,7 +682,7 @@ const PortfolioService = {
   exchangeZerodhaToken: async (requestToken: string): Promise<boolean> => {
     try {
       const { data, error } = await supabase.functions.invoke('zerodha-exchange-token', {
-        body: { requestToken }
+        body: { request_token: requestToken }
       });
       
       if (error || !data?.success) {

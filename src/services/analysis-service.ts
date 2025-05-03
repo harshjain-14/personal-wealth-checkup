@@ -1,261 +1,185 @@
 
-import { PortfolioData } from '@/services/portfolio-service';
-import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+// This file contains the implementation of AnalysisService 
+// for generating portfolio analysis reports using AI
 
-// Define types needed for the portfolio analysis
-export interface PerformanceMetrics {
-  totalValue: number;
-  profitLoss: number;
-  profitLossPercentage: number;
-  cagr?: number;
-  irr?: number;
-  sharpeRatio?: number;
-}
+import { supabase } from "@/integrations/supabase/client";
+import { PortfolioData } from "./portfolio-service";
+import { toast } from "sonner";
 
-export interface SectorBreakdown {
-  sector: string;
-  totalValue: number;
-  percentage: number;
-}
-
-export interface AssetAllocationItem {
-  type: string;
-  percentage: number;
-  value: number;
-}
-
-export type AssetAllocation = AssetAllocationItem[];
-
-export interface RiskMetrics {
-  volatility: {
-    portfolioBeta: number;
-    marketComparison: string;
-  };
-  qualityScore: {
-    overall: number;
-    stability?: number;
-    growth?: number;
-    value?: number;
-  };
-}
-
-export interface TaxInsights {
-  potentialSavings: number;
-  suggestions: string[];
-}
-
-export interface PortfolioInsight {
-  type: 'strength' | 'warning' | 'suggestion' | 'tax' | 'goal' | 'volatility';
+// Define the structure for analysis report
+export interface AnalysisSection {
   title: string;
-  description: string;
-  priority?: 'low' | 'medium' | 'high';
-  actionable?: boolean;
+  content: string[];
+  recommendations?: string[];
 }
 
-// Define the structure of the analysis report
+export interface AllocationSection {
+  title: string;
+  currentAllocation: Record<string, number>;
+  recommendedAllocation?: Record<string, number>;
+  riskAssessment?: string;
+}
+
+export interface ScoringSection {
+  title: string;
+  scores: {
+    category: string;
+    score: number;
+    maxScore: number;
+    description: string;
+  }[];
+  overallScore: number;
+  overallMaxScore: number;
+}
+
 export interface AnalysisReport {
-  summary: string;
-  assetAllocation: AssetAllocation;
-  performanceMetrics: PerformanceMetrics;
-  sectorBreakdown: SectorBreakdown[];
-  riskMetrics: RiskMetrics;
-  insights: PortfolioInsight[];
-  taxInsights: TaxInsights;
-  keyRecommendations: string[];
-  actionItems: string[];
-  timestamp: string;
-  generatedDate: string;
+  id?: number;
+  userId?: string;
+  portfolioOverview: AnalysisSection;
+  riskAnalysis: AnalysisSection;
+  taxEfficiency: AnalysisSection;
+  diversification: AnalysisSection;
+  assetAllocation: AllocationSection;
+  recommendations: AnalysisSection;
+  emergencyFund: AnalysisSection;
+  scoring: ScoringSection;
+  generatedAt: string;
 }
 
-// Default analysis report structure
-const DEFAULT_ANALYSIS: AnalysisReport = {
-  summary: "Your portfolio is diversified across stocks, mutual funds, and other assets. Based on your goals and risk tolerance, we recommend some adjustments to optimize your returns.",
-  performanceMetrics: {
-    totalValue: 100000,
-    profitLoss: 12000,
-    profitLossPercentage: 12,
-    cagr: 8.5,
-    irr: 9.2,
-    sharpeRatio: 0.75
-  },
-  assetAllocation: [
-    { type: "Equities", percentage: 45, value: 45000 },
-    { type: "Mutual Funds", percentage: 30, value: 30000 },
-    { type: "Fixed Deposits", percentage: 15, value: 15000 },
-    { type: "Others", percentage: 10, value: 10000 }
-  ],
-  sectorBreakdown: [
-    { sector: "Technology", totalValue: 30000, percentage: 30 },
-    { sector: "Financial", totalValue: 25000, percentage: 25 },
-    { sector: "Healthcare", totalValue: 20000, percentage: 20 },
-    { sector: "Consumer Goods", totalValue: 15000, percentage: 15 },
-    { sector: "Others", totalValue: 10000, percentage: 10 }
-  ],
-  riskMetrics: {
-    volatility: {
-      portfolioBeta: 0.85,
-      marketComparison: "Your portfolio is less volatile than the market average"
-    },
-    qualityScore: {
-      overall: 72,
-      stability: 75,
-      growth: 68,
-      value: 72
-    }
-  },
-  insights: [
-    {
-      type: "strength",
-      title: "Strong Diversification",
-      description: "Your portfolio has good diversification across different asset classes",
-      priority: "medium"
-    },
-    {
-      type: "warning",
-      title: "High Tech Exposure",
-      description: "Technology sector represents 30% of your equity investments, which may increase volatility",
-      priority: "high",
-      actionable: true
-    },
-    {
-      type: "suggestion",
-      title: "Increase Index Fund Allocation",
-      description: "Consider increasing your index fund allocation to reduce fees and increase diversification",
-      priority: "medium",
-      actionable: true
-    }
-  ],
-  taxInsights: {
-    potentialSavings: 15000,
-    suggestions: [
-      "Utilize ELSS funds for tax-saving under section 80C",
-      "Consider tax-free bonds for fixed income allocation",
-      "Review holding periods to minimize capital gains taxes"
-    ]
-  },
-  keyRecommendations: [
-    "Increase equity exposure by 5-10%",
-    "Diversify away from concentrated tech positions",
-    "Consider tax-advantaged investment options",
-    "Increase retirement contributions by 5%"
-  ],
-  actionItems: [
-    "Rebalance portfolio by the end of this quarter",
-    "Set up automatic monthly investments into index funds",
-    "Review and optimize tax strategies with a financial advisor",
-    "Create an emergency fund of 6 months' expenses"
-  ],
-  timestamp: new Date().toISOString(),
-  generatedDate: new Date().toISOString()
-};
-
-// Analysis service using AI API
+// Create a service for portfolio analysis
 const AnalysisService = {
   generateAnalysis: async (portfolioData: PortfolioData): Promise<AnalysisReport> => {
     try {
-      // Get the current user session
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        console.error('User not authenticated');
-        toast.error('You must be logged in to generate analysis');
-        return DEFAULT_ANALYSIS;
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) {
+        throw new Error("User not authenticated");
       }
 
-      toast.info('Generating portfolio analysis...', {
-        duration: 10000,
-        id: 'generating-analysis'
+      toast.info("Analyzing your portfolio... This may take a moment.", {
+        duration: 3000,
       });
-      
-      // Call portfolio-analysis edge function
+
+      // Call the Supabase Edge Function to analyze the portfolio
       const { data, error } = await supabase.functions.invoke('portfolio-analysis', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        },
         body: { portfolioData }
       });
-      
-      // Remove the toast
-      toast.dismiss('generating-analysis');
-      
+
       if (error) {
-        console.error('Error generating analysis:', error);
-        toast.error(`Analysis generation failed: ${error.message}`);
-        return DEFAULT_ANALYSIS;
+        console.error("Analysis function error:", error);
+        throw new Error(`Failed to generate analysis: ${error.message}`);
+      }
+
+      if (!data || !data.analysis) {
+        throw new Error("No analysis data returned");
+      }
+
+      // Parse analysis response
+      const analysis = data.analysis as AnalysisReport;
+      
+      // Add generation timestamp if not present
+      if (!analysis.generatedAt) {
+        analysis.generatedAt = new Date().toISOString();
       }
       
-      if (!data) {
-        console.error('No analysis data returned');
-        toast.error('Failed to generate analysis');
-        return DEFAULT_ANALYSIS;
-      }
-      
-      // Add timestamp to the analysis data
-      const analysisWithDate: AnalysisReport = {
-        ...data,
-        timestamp: new Date().toISOString(),
-        generatedDate: new Date().toISOString()
-      };
-      
-      // Save the analysis to the database using RPC call instead of direct insert
-      try {
-        // Use an RPC function to save the analysis
-        const { error: saveError } = await supabase.rpc('save_portfolio_analysis', {
-          p_user_id: session.user.id,
-          p_analysis_data: analysisWithDate
-        });
-          
-        if (saveError) {
-          console.error("Error saving analysis to database:", saveError);
-        } else {
-          console.log("Successfully saved analysis to database");
-        }
-      } catch (dbError) {
-        console.error("Database operation failed:", dbError);
-      }
-      
-      toast.success('Portfolio analysis generated successfully');
-      return analysisWithDate;
+      // Save the analysis to Supabase
+      await AnalysisService.saveAnalysis(analysis);
+
+      return analysis;
     } catch (error: any) {
-      console.error('Error in generateAnalysis:', error);
-      toast.error(`Analysis generation error: ${error.message || 'Unknown error'}`);
-      return DEFAULT_ANALYSIS;
+      console.error("Error analyzing portfolio:", error);
+      throw error;
     }
   },
   
-  // Get the latest analysis from the database
+  saveAnalysis: async (analysis: AnalysisReport): Promise<void> => {
+    try {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) {
+        console.error("Cannot save analysis: User not authenticated");
+        return;
+      }
+
+      // Store the analysis in the database
+      const { error } = await supabase
+        .from('portfolio_analysis')
+        .insert({
+          user_id: user.id,
+          analysis_data: analysis,
+          generated_at: analysis.generatedAt
+        });
+
+      if (error) {
+        console.error("Error saving analysis:", error);
+        throw error;
+      }
+
+      console.log("Analysis saved successfully");
+    } catch (error) {
+      console.error("Error saving analysis:", error);
+    }
+  },
+  
   getLatestAnalysis: async (): Promise<AnalysisReport | null> => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) {
+        console.log("Cannot get analysis: User not authenticated");
         return null;
       }
-      
-      // Use RPC function to get the latest analysis
-      const { data, error } = await supabase.rpc('get_latest_analysis', {
-        p_user_id: session.user.id
-      });
-        
+
+      // Query the latest analysis directly instead of using RPC
+      const { data, error } = await supabase
+        .from('portfolio_analysis')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('generated_at', { ascending: false })
+        .limit(1)
+        .single();
+
       if (error) {
-        console.error('Error fetching latest analysis:', error);
+        console.error("Error fetching latest analysis:", error);
         return null;
       }
-      
-      // If no data is found, return null
+
       if (!data) {
         return null;
       }
-      
-      // Parse the JSON data if it's returned as a string
-      if (typeof data === 'string') {
-        return JSON.parse(data) as AnalysisReport;
-      }
-      
-      return data as AnalysisReport;
+
+      return data.analysis_data as AnalysisReport;
     } catch (error) {
-      console.error('Error in getLatestAnalysis:', error);
+      console.error("Error in getLatestAnalysis:", error);
       return null;
+    }
+  },
+  
+  getAllAnalyses: async (): Promise<AnalysisReport[]> => {
+    try {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) {
+        console.log("Cannot get analyses: User not authenticated");
+        return [];
+      }
+
+      // Get all analyses for the user
+      const { data, error } = await supabase
+        .from('portfolio_analysis')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('generated_at', { ascending: false });
+
+      if (error) {
+        console.error("Error fetching analyses:", error);
+        return [];
+      }
+
+      if (!data?.length) {
+        return [];
+      }
+
+      return data.map(item => item.analysis_data as AnalysisReport);
+    } catch (error) {
+      console.error("Error in getAllAnalyses:", error);
+      return [];
     }
   }
 };

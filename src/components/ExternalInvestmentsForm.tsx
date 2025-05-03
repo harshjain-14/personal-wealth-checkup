@@ -52,7 +52,14 @@ const ExternalInvestmentsForm = ({ investments, onSave }: ExternalInvestmentsFor
       return;
     }
 
-    setInvestmentsList([...investmentsList, { ...newInvestment, amount: Number(newInvestment.amount) }]);
+    // Add ID to ensure React keys are unique if not coming from DB
+    const investmentWithId = { 
+      ...newInvestment, 
+      amount: Number(newInvestment.amount),
+      id: newInvestment.id || Date.now() 
+    };
+    
+    setInvestmentsList([...investmentsList, investmentWithId]);
     setNewInvestment({
       type: 'Fixed Deposit',
       name: '',
@@ -70,8 +77,14 @@ const ExternalInvestmentsForm = ({ investments, onSave }: ExternalInvestmentsFor
     toast.success('Investment removed');
   };
 
-  const handleSave = () => {
-    onSave(investmentsList);
+  const handleSave = async () => {
+    try {
+      await onSave(investmentsList);
+      toast.success('Investments saved successfully');
+    } catch (error) {
+      console.error('Error saving investments:', error);
+      toast.error('Failed to save investments');
+    }
   };
 
   return (

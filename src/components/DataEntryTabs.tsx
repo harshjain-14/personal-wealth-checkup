@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardDescription, CardFooter, CardTitle } from '@/components/ui/card';
@@ -26,6 +25,7 @@ const DataEntryTabs = ({ portfolioData, onDataSaved, onAnalysisRequest }: DataEn
   );
   const [activeTab, setActiveTab] = useState('zerodha');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Update the local state when portfolioData changes
   useEffect(() => {
@@ -55,46 +55,90 @@ const DataEntryTabs = ({ portfolioData, onDataSaved, onAnalysisRequest }: DataEn
   };
 
   const handleSaveExternalInvestments = async (investments: ExternalInvestment[]) => {
+    setIsSaving(true);
     try {
+      // Save external investments
       await PortfolioService.saveExternalInvestments(investments);
-      const updatedData = await PortfolioService.getPortfolioData();
+      
+      // Get updated portfolio data (all data, not just investments)
+      const updatedData = {
+        ...portfolioData,
+        externalInvestments: investments,
+        lastUpdated: new Date().toISOString()
+      };
+      
+      // Update local state through parent component
       onDataSaved(updatedData);
+      
+      console.log("External investments saved and data updated");
     } catch (error) {
       console.error('Error saving external investments:', error);
       toast.error('Failed to save external investments');
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleSaveExpenses = async (expenses: Expense[]) => {
+    setIsSaving(true);
     try {
       await PortfolioService.saveExpenses(expenses);
-      const updatedData = await PortfolioService.getPortfolioData();
+      
+      // Update local state without full reload
+      const updatedData = {
+        ...portfolioData,
+        expenses: expenses,
+        lastUpdated: new Date().toISOString()
+      };
+      
       onDataSaved(updatedData);
     } catch (error) {
       console.error('Error saving expenses:', error);
       toast.error('Failed to save expenses');
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleSaveFutureExpenses = async (futureExpenses: FutureExpense[]) => {
+    setIsSaving(true);
     try {
       await PortfolioService.saveFutureExpenses(futureExpenses);
-      const updatedData = await PortfolioService.getPortfolioData();
+      
+      // Update local state without full reload
+      const updatedData = {
+        ...portfolioData,
+        futureExpenses: futureExpenses,
+        lastUpdated: new Date().toISOString()
+      };
+      
       onDataSaved(updatedData);
     } catch (error) {
       console.error('Error saving future expenses:', error);
       toast.error('Failed to save future expenses');
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleSaveUserInfo = async (userInfo: UserInfo) => {
+    setIsSaving(true);
     try {
       await PortfolioService.saveUserInfo(userInfo);
-      const updatedData = await PortfolioService.getPortfolioData();
+      
+      // Update local state without full reload
+      const updatedData = {
+        ...portfolioData,
+        userInfo: userInfo,
+        lastUpdated: new Date().toISOString()
+      };
+      
       onDataSaved(updatedData);
     } catch (error) {
       console.error('Error saving user info:', error);
       toast.error('Failed to save user information');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -195,10 +239,17 @@ const DataEntryTabs = ({ portfolioData, onDataSaved, onAnalysisRequest }: DataEn
         <div className="p-6 pt-0 flex justify-end">
           <Button 
             onClick={handleAnalyzePortfolio}
-            className="bg-finance-blue hover:bg-finance-blue/90"
-            disabled={!zerodhaConnected || isAnalyzing}
+            className="w-full bg-finance-blue hover:bg-finance-blue/90"
+            disabled={!zerodhaConnected || isAnalyzing || isSaving}
           >
-            {isAnalyzing ? 'Analyzing Portfolio...' : 'Generate Portfolio Analysis'}
+            {isAnalyzing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Analyzing Portfolio...
+              </>
+            ) : (
+              'Generate Portfolio Analysis'
+            )}
           </Button>
         </div>
       </Tabs>
