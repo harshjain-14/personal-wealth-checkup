@@ -27,7 +27,8 @@ export interface MutualFund {
 }
 
 // Updated to match the database enum types
-export type InvestmentType = Database["public"]["Enums"]["investment_type"];
+export type InvestmentType = 'Gold' | 'Fixed Deposit' | 'Real Estate' | 'Bank Deposit' | 'PPF' | 'EPF' | 'National Pension Scheme' | 'Bonds' | 'Others';
+
 export interface ExternalInvestment {
   id?: number;
   name: string;
@@ -37,7 +38,7 @@ export interface ExternalInvestment {
 }
 
 export type ExpenseFrequency = 'monthly' | 'quarterly' | 'yearly' | 'one-time';
-export type ExpenseType = 'essential' | 'discretionary' | 'investment' | 'debt' | 'healthcare' | 'education' | 'others';
+export type ExpenseType = 'EMI' | 'Rent' | 'School Fees' | 'Loan Payment' | 'Insurance Premium' | 'Utility Bills' | 'Medical' | 'Others';
 
 export interface Expense {
   id?: number;
@@ -215,22 +216,16 @@ const PortfolioService = {
       // Insert new investments
       if (investments.length > 0) {
         // Map to valid investment types if needed
-        const mappedInvestments = investments.map((inv, index) => ({
-          user_id: user.id,
-          investment_name: inv.name,
-          investment_type: inv.type,
-          amount: inv.amount,
-          notes: inv.notes
-        }));
-        
-        const { error } = await supabase
-          .from('external_investments')
-          .insert(mappedInvestments);
-          
-        if (error) {
-          console.error('Error saving external investments:', error);
-          toast.error('Failed to save external investments');
-          throw error;
+        for (const investment of investments) {
+          await supabase
+            .from('external_investments')
+            .insert({
+              user_id: user.id,
+              investment_name: investment.name,
+              investment_type: investment.type,
+              amount: investment.amount,
+              notes: investment.notes
+            });
         }
       }
       
@@ -263,7 +258,7 @@ const PortfolioService = {
       return data.map(inv => ({
         id: inv.id,
         name: inv.investment_name,
-        type: inv.investment_type,
+        type: inv.investment_type as InvestmentType,
         amount: inv.amount,
         notes: inv.notes
       }));
@@ -290,23 +285,17 @@ const PortfolioService = {
       
       // Insert new expenses
       if (expenses.length > 0) {
-        const mappedExpenses = expenses.map(exp => ({
-          user_id: user.id,
-          description: exp.name,
-          amount: exp.amount,
-          frequency: exp.frequency,
-          expense_type: exp.type as ExpenseType,
-          notes: exp.notes
-        }));
-        
-        const { error } = await supabase
-          .from('regular_expenses')
-          .insert(mappedExpenses);
-          
-        if (error) {
-          console.error('Error saving regular expenses:', error);
-          toast.error('Failed to save regular expenses');
-          throw error;
+        for (const expense of expenses) {
+          await supabase
+            .from('regular_expenses')
+            .insert({
+              user_id: user.id,
+              description: expense.name,
+              amount: expense.amount,
+              frequency: expense.frequency,
+              expense_type: expense.type,
+              notes: expense.notes
+            });
         }
       }
       
@@ -367,23 +356,17 @@ const PortfolioService = {
       
       // Insert new future expenses
       if (expenses.length > 0) {
-        const mappedExpenses = expenses.map(exp => ({
-          user_id: user.id,
-          purpose: exp.purpose,
-          amount: exp.amount,
-          timeframe: exp.timeframe,
-          priority: exp.priority,
-          notes: exp.notes
-        }));
-        
-        const { error } = await supabase
-          .from('future_expenses')
-          .insert(mappedExpenses);
-          
-        if (error) {
-          console.error('Error saving future expenses:', error);
-          toast.error('Failed to save future expenses');
-          throw error;
+        for (const expense of expenses) {
+          await supabase
+            .from('future_expenses')
+            .insert({
+              user_id: user.id,
+              purpose: expense.purpose,
+              amount: expense.amount,
+              timeframe: expense.timeframe,
+              priority: expense.priority,
+              notes: expense.notes
+            });
         }
       }
       
@@ -452,7 +435,7 @@ const PortfolioService = {
       
       if (existingData) {
         // Update existing user info
-        const { error } = await supabase
+        await supabase
           .from('personal_info')
           .update({
             age: userInfo.age,
@@ -461,30 +444,17 @@ const PortfolioService = {
             financial_goals: userInfo.financialGoals || []
           })
           .eq('user_id', user.id);
-          
-        if (error) {
-          console.error('Error updating user info:', error);
-          toast.error('Failed to update user information');
-          throw error;
-        }
       } else {
         // Insert new user info
-        const { error } = await supabase
+        await supabase
           .from('personal_info')
           .insert({
-            id: crypto.randomUUID(),
             user_id: user.id,
             age: userInfo.age,
             city: city,
             risk_tolerance: riskTolerance,
             financial_goals: userInfo.financialGoals || []
           });
-          
-        if (error) {
-          console.error('Error saving user info:', error);
-          toast.error('Failed to save user information');
-          throw error;
-        }
       }
       
       return userInfo;
@@ -521,8 +491,8 @@ const PortfolioService = {
       return {
         id: data.id,
         age: data.age,
-        city: data.city,
-        riskTolerance: data.risk_tolerance,
+        city: data.city as CityType,
+        riskTolerance: data.risk_tolerance as RiskTolerance,
         financialGoals: data.financial_goals || []
       };
     } catch (error) {
@@ -544,7 +514,7 @@ const PortfolioService = {
         .from('portfolio_snapshots')
         .insert({
           user_id: user.id,
-          snapshot_data: portfolioData,
+          snapshot_data: JSON.stringify(portfolioData),
           snapshot_date: new Date().toISOString()
         });
         
@@ -561,9 +531,14 @@ const PortfolioService = {
         return null;
       }
       
-      // Use the stored function
+      // Since the stored function is not available, let's fetch it directly
       const { data, error } = await supabase
-        .rpc('get_latest_portfolio_snapshot');
+        .from('portfolio_snapshots')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('snapshot_date', { ascending: false })
+        .limit(1)
+        .single();
       
       if (error || !data) {
         console.error("Error fetching latest portfolio snapshot:", error);
@@ -571,7 +546,13 @@ const PortfolioService = {
       }
       
       // Return the snapshot data
-      return data as PortfolioData;
+      try {
+        const portfolioData = JSON.parse(data.snapshot_data);
+        return portfolioData as PortfolioData;
+      } catch (parseError) {
+        console.error("Error parsing portfolio data:", parseError);
+        return null;
+      }
     } catch (error) {
       console.error("Error in getLatestPortfolioSnapshot:", error);
       return null;

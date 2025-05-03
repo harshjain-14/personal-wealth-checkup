@@ -198,6 +198,25 @@ const AnalysisService = {
         generatedDate: new Date().toISOString()
       };
       
+      // Save the analysis to the database using direct insert
+      try {
+        const { error: saveError } = await supabase
+          .from('portfolio_analysis')
+          .insert({
+            user_id: session.user.id,
+            analysis_data: analysisWithDate,
+            analysis_date: new Date().toISOString()
+          });
+          
+        if (saveError) {
+          console.error("Error saving analysis to database:", saveError);
+        } else {
+          console.log("Successfully saved analysis to database");
+        }
+      } catch (dbError) {
+        console.error("Database operation failed:", dbError);
+      }
+      
       toast.success('Portfolio analysis generated successfully');
       return analysisWithDate;
     } catch (error: any) {
@@ -215,9 +234,14 @@ const AnalysisService = {
         return null;
       }
       
-      // Use the stored procedure to fetch the latest analysis
+      // Fetch directly since the RPC function is not available
       const { data, error } = await supabase
-        .rpc('get_latest_analysis');
+        .from('portfolio_analysis')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .order('analysis_date', { ascending: false })
+        .limit(1)
+        .single();
         
       if (error) {
         console.error('Error fetching latest analysis:', error);
@@ -229,7 +253,7 @@ const AnalysisService = {
         return null;
       }
       
-      return data as AnalysisReport;
+      return data.analysis_data as AnalysisReport;
     } catch (error) {
       console.error('Error in getLatestAnalysis:', error);
       return null;

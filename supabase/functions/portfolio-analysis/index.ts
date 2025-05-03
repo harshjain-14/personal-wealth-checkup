@@ -175,7 +175,7 @@ serve(async (req) => {
       ${externalInvestments.map(i => `- ${i.name} (${i.type}): ₹${i.amount} ${i.notes ? `- ${i.notes}` : ''}`).join('\n')}
 
       ## Regular Expenses
-      ${expenses.map(e => `- ${e.description} (${e.expense_type}): ₹${e.amount} (${e.frequency}) ${e.notes ? `- ${e.notes}` : ''}`).join('\n')}
+      ${expenses.map(e => `- ${e.name} (${e.type}): ₹${e.amount} (${e.frequency}) ${e.notes ? `- ${e.notes}` : ''}`).join('\n')}
 
       ## Future Expenses
       ${futureExpenses.map(e => `- ${e.purpose}: ₹${e.amount} within ${e.timeframe}, priority: ${e.priority} ${e.notes ? `- ${e.notes}` : ''}`).join('\n')}
@@ -368,7 +368,7 @@ serve(async (req) => {
           .insert({
             user_id: user.id,
             analysis_data: analysis,
-            portfolio_data: portfolioData,
+            portfolio_data: JSON.stringify(portfolioData),
             analysis_date: new Date().toISOString()
           });
           
