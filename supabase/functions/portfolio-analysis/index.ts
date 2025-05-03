@@ -64,11 +64,23 @@ serve(async (req) => {
     }
     
     // Parse the request body
-    const { portfolioData } = await req.json();
+    let portfolioData;
+    try {
+      const requestData = await req.json();
+      portfolioData = requestData.portfolioData;
     
-    if (!portfolioData) {
+      if (!portfolioData) {
+        return new Response(
+          JSON.stringify({ error: "Missing portfolio data" }),
+          { 
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+    } catch (parseError) {
       return new Response(
-        JSON.stringify({ error: "Missing portfolio data" }),
+        JSON.stringify({ error: `Error parsing request: ${parseError.message}` }),
         { 
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -83,11 +95,36 @@ serve(async (req) => {
       externalInvestments = [], 
       expenses = [], 
       futureExpenses = [], 
-      userInfo
+      userInfo,
+      zerodhaHoldings = []
     } = portfolioData;
 
+    // Add Zerodha holdings to stocks array for analysis
+    const combinedStocks = [...stocks];
+    
+    if (zerodhaHoldings && zerodhaHoldings.length > 0) {
+      zerodhaHoldings.forEach(holding => {
+        // Check if this holding already exists in the stocks array
+        const existingStock = combinedStocks.find(stock => 
+          stock.symbol === holding.tradingsymbol
+        );
+        
+        if (!existingStock) {
+          // Add as a new stock
+          combinedStocks.push({
+            symbol: holding.tradingsymbol,
+            name: holding.tradingsymbol, // Use the trading symbol as name since we don't have company name
+            quantity: holding.quantity,
+            averagePrice: holding.average_price,
+            currentPrice: holding.last_price,
+            sector: 'Unknown' // We don't have sector info from Zerodha API
+          });
+        }
+      });
+    }
+
     // Calculate total values for summary
-    const stocksValue = stocks.reduce((total, stock) => total + (stock.quantity * stock.currentPrice), 0);
+    const stocksValue = combinedStocks.reduce((total, stock) => total + (stock.quantity * stock.currentPrice), 0);
     const mutualFundsValue = mutualFunds.reduce((total, fund) => total + fund.currentValue, 0);
     const externalValue = externalInvestments.reduce((total, inv) => total + inv.amount, 0);
     const monthlyExpenses = expenses
@@ -124,12 +161,12 @@ serve(async (req) => {
       - Planned Future Expenses: ₹${plannedFutureExpenses.toFixed(2)}
 
       ## Investments Breakdown
-      - Stocks: ${stocks.length} holdings worth ₹${stocksValue.toFixed(2)}
+      - Stocks: ${combinedStocks.length} holdings worth ₹${stocksValue.toFixed(2)}
       - Mutual Funds: ${mutualFunds.length} funds worth ₹${mutualFundsValue.toFixed(2)}
       - External Investments: ${externalInvestments.length} investments worth ₹${externalValue.toFixed(2)}
 
       ## Detailed Stock Holdings
-      ${stocks.map(s => `- ${s.name} (${s.symbol}): ${s.quantity} shares at avg. price ₹${s.averagePrice}, current price ₹${s.currentPrice}, sector: ${s.sector}`).join('\n')}
+      ${combinedStocks.map(s => `- ${s.name} (${s.symbol}): ${s.quantity} shares at avg. price ₹${s.averagePrice}, current price ₹${s.currentPrice}, sector: ${s.sector}`).join('\n')}
 
       ## Detailed Mutual Fund Holdings
       ${mutualFunds.map(f => `- ${f.name}: invested ₹${f.investedAmount}, current value ₹${f.currentValue}, category: ${f.category}`).join('\n')}
@@ -138,7 +175,7 @@ serve(async (req) => {
       ${externalInvestments.map(i => `- ${i.name} (${i.type}): ₹${i.amount} ${i.notes ? `- ${i.notes}` : ''}`).join('\n')}
 
       ## Regular Expenses
-      ${expenses.map(e => `- ${e.name} (${e.type}): ₹${e.amount} (${e.frequency}) ${e.notes ? `- ${e.notes}` : ''}`).join('\n')}
+      ${expenses.map(e => `- ${e.description} (${e.expense_type}): ₹${e.amount} (${e.frequency}) ${e.notes ? `- ${e.notes}` : ''}`).join('\n')}
 
       ## Future Expenses
       ${futureExpenses.map(e => `- ${e.purpose}: ₹${e.amount} within ${e.timeframe}, priority: ${e.priority} ${e.notes ? `- ${e.notes}` : ''}`).join('\n')}
@@ -228,32 +265,46 @@ serve(async (req) => {
 
     // Call Claude API for analysis
     console.log("Sending request to Claude API");
-    const claudeResponse = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": CLAUDE_API_KEY,
-        "anthropic-version": "2023-06-01"
-      },
-      body: JSON.stringify({
-        model: "claude-3-sonnet-20240229",
-        max_tokens: 4000,
-        messages: [
-          {
-            role: "user",
-            content: message
-          }
-        ],
-        temperature: 0.5,
-        system: "You are a financial advisor specializing in portfolio analysis. Provide insightful, accurate, and actionable financial advice. Only respond with valid JSON as specified in the user's message."
-      })
-    });
+    let analysis;
+    let claudeResponse;
+    
+    try {
+      claudeResponse = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": CLAUDE_API_KEY,
+          "anthropic-version": "2023-06-01"
+        },
+        body: JSON.stringify({
+          model: "claude-3-sonnet-20240229",
+          max_tokens: 4000,
+          messages: [
+            {
+              role: "user",
+              content: message
+            }
+          ],
+          temperature: 0.5,
+          system: "You are a financial advisor specializing in portfolio analysis. Provide insightful, accurate, and actionable financial advice. Only respond with valid JSON as specified in the user's message."
+        })
+      });
+    } catch (fetchError) {
+      console.error("Error fetching from Claude API:", fetchError);
+      return new Response(
+        JSON.stringify({ error: `Error connecting to Claude API: ${fetchError.message}` }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
 
     if (!claudeResponse.ok) {
       const errorText = await claudeResponse.text();
       console.error("Claude API error:", errorText);
       return new Response(
-        JSON.stringify({ error: "Failed to analyze portfolio with Claude AI" }),
+        JSON.stringify({ error: "Failed to analyze portfolio with Claude AI", details: errorText }),
         {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -265,36 +316,77 @@ serve(async (req) => {
     console.log("Received response from Claude API");
     
     // Extract the analysis from Claude's response
-    let analysis;
     try {
       // Get the JSON string from Claude's response content
       const responseContent = claudeData.content[0].text;
+      console.log("Raw Claude response:", responseContent.substring(0, 300) + "...");
       
       // Extract JSON from the response (in case Claude adds any extra text)
       const jsonMatch = responseContent.match(/\{[\s\S]*\}/);
-      const jsonString = jsonMatch ? jsonMatch[0] : responseContent;
+      if (!jsonMatch) {
+        throw new Error("Could not extract JSON from Claude's response");
+      }
       
-      analysis = JSON.parse(jsonString);
+      const jsonString = jsonMatch[0];
+      console.log("Extracted JSON string:", jsonString.substring(0, 300) + "...");
+      
+      try {
+        analysis = JSON.parse(jsonString);
+        console.log("Successfully parsed JSON from Claude's response");
+      } catch (jsonParseError) {
+        console.error("Failed to parse JSON:", jsonParseError);
+        throw new Error(`Failed to parse JSON from Claude's response: ${jsonParseError.message}`);
+      }
+      
+      // Validate analysis structure
+      const requiredFields = [
+        'summary', 
+        'performanceMetrics', 
+        'assetAllocation', 
+        'sectorBreakdown', 
+        'riskMetrics',
+        'insights',
+        'taxInsights',
+        'keyRecommendations',
+        'actionItems'
+      ];
+      
+      for (const field of requiredFields) {
+        if (!analysis[field]) {
+          console.error(`Missing required field in analysis: ${field}`);
+          analysis[field] = field === 'insights' ? [] : 
+                           field === 'keyRecommendations' ? [] : 
+                           field === 'actionItems' ? [] : 
+                           field === 'summary' ? "Analysis generated with some missing elements." : {};
+        }
+      }
       
       // Save the analysis to the database
-      const { error: saveError } = await supabase
-        .from('portfolio_analysis')
-        .insert({
-          user_id: user.id,
-          analysis_data: analysis,
-          portfolio_data: portfolioData,
-          analysis_date: new Date().toISOString()
-        });
-        
-      if (saveError) {
-        console.error("Error saving analysis to database:", saveError);
+      try {
+        const { error: saveError } = await supabase
+          .from('portfolio_analysis')
+          .insert({
+            user_id: user.id,
+            analysis_data: analysis,
+            portfolio_data: portfolioData,
+            analysis_date: new Date().toISOString()
+          });
+          
+        if (saveError) {
+          console.error("Error saving analysis to database:", saveError);
+        } else {
+          console.log("Successfully saved analysis to database");
+        }
+      } catch (dbError) {
+        console.error("Database operation failed:", dbError);
       }
     } catch (parseError) {
-      console.error("Error parsing Claude response:", parseError);
+      console.error("Error processing Claude response:", parseError);
       return new Response(
         JSON.stringify({ 
-          error: "Failed to parse portfolio analysis", 
-          claudeResponse: claudeData.content[0].text 
+          error: "Failed to process portfolio analysis", 
+          details: parseError.message,
+          claudeResponse: claudeData.content[0].text.substring(0, 1000) + "..." 
         }),
         {
           status: 500,

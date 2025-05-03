@@ -213,14 +213,10 @@ const AnalysisService = {
         return null;
       }
       
-      // Need to perform a raw query since portfolio_analysis might not be in the types yet
-      // This avoids the TypeScript errors by casting the result
+      // Use a raw SQL query approach to avoid TypeScript errors
+      // This is because the portfolio_analysis table might not be in the types yet
       const { data, error } = await supabase
-        .from('portfolio_analysis')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .order('analysis_date', { ascending: false })
-        .limit(1)
+        .rpc('get_latest_analysis')
         .single();
         
       if (error) {
@@ -233,17 +229,7 @@ const AnalysisService = {
         return null;
       }
       
-      // Cast the data to have the expected properties
-      const analysisData = data as unknown as {
-        analysis_data: any;
-        analysis_date: string;
-      };
-      
-      return {
-        ...analysisData.analysis_data,
-        timestamp: analysisData.analysis_date,
-        generatedDate: analysisData.analysis_date
-      };
+      return data as AnalysisReport;
     } catch (error) {
       console.error('Error in getLatestAnalysis:', error);
       return null;

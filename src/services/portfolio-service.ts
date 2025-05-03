@@ -2,11 +2,11 @@
 // Updated Portfolio service to use Supabase
 
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { Database } from "@/integrations/supabase/types";
+import { toast } from 'sonner';
 
-// Types that match our frontend UI components
+// Define types for portfolio data
 export interface Stock {
+  id?: number;
   symbol: string;
   name: string;
   quantity: number;
@@ -16,931 +16,123 @@ export interface Stock {
 }
 
 export interface MutualFund {
+  id?: number;
   name: string;
   investedAmount: number;
   currentValue: number;
   category: string;
+  nav?: number;
+  units?: number;
 }
-
-// Type that matches the database schema
-type InvestmentType = Database["public"]["Enums"]["investment_type"];
-type CityEnum = Database["public"]["Enums"]["city_enum"];
 
 export interface ExternalInvestment {
-  type: string;
+  id?: number;
   name: string;
+  type: 'Gold' | 'Fixed Deposit' | 'Real Estate' | 'Insurance' | 'EPF/PPF' | 'Bonds' | 'Crypto' | 'Others';
   amount: number;
   notes?: string;
-  id?: number;
 }
 
-type ExpenseType = Database["public"]["Enums"]["expense_type_enum"];
-type ExpenseFrequency = Database["public"]["Enums"]["expense_frequency_enum"];
-
-// Map frontend frequency to database enum
-const mapFrequencyToEnum = (freq: string): ExpenseFrequency => {
-  switch (freq.toLowerCase()) {
-    case 'monthly': return 'Monthly';
-    case 'quarterly': return 'Quarterly';
-    case 'yearly': return 'Yearly';
-    case 'one-time': return 'One-time';
-    default: return 'Monthly'; // Default fallback
-  }
-};
-
-// Map database enum to frontend frequency
-const mapEnumToFrequency = (freq: ExpenseFrequency): 'monthly' | 'quarterly' | 'yearly' | 'one-time' => {
-  switch (freq) {
-    case 'Monthly': return 'monthly';
-    case 'Quarterly': return 'quarterly';
-    case 'Yearly': return 'yearly';
-    case 'One-time': return 'one-time';
-    default: return 'monthly'; // Default fallback
-  }
-};
-
-export interface Expense {
-  type: string;
-  name: string;
+export interface RegularExpense {
+  id?: number;
+  description: string;
   amount: number;
-  frequency: 'monthly' | 'quarterly' | 'yearly' | 'one-time';
+  frequency: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+  expense_type: 'essential' | 'discretionary' | 'investment' | 'debt' | 'healthcare' | 'education' | 'others';
   notes?: string;
-  id?: number;
 }
-
-type PurposeType = Database["public"]["Enums"]["future_expense_enumm"];
-type TimeframeType = Database["public"]["Enums"]["timeframe_enum"];
-type PriorityType = Database["public"]["Enums"]["priority_enum"];
-
-// Map frontend purpose to database enum
-const mapPurposeToEnum = (purpose: string): PurposeType => {
-  // Using a direct mapping approach to ensure exact matches with the database enum
-  if (purpose === 'House Purchase') return 'House Purchase';
-  if (purpose === 'Car Purchase') return 'Car Purchase';
-  if (purpose === 'Education') return 'Education';
-  if (purpose === 'Wedding') return 'Wedding';
-  if (purpose === 'Medical Treatment') return 'Medical Treatment';
-  if (purpose === 'Vacation') return 'Vacation';
-  if (purpose === 'Home Renovation') return 'Home Renovation';
-  if (purpose === 'Business Startup') return 'Business Startup';
-  return 'Other'; // Default fallback
-};
-
-// Map timeframe to database enum
-const mapTimeframeToEnum = (timeframe: string): TimeframeType => {
-  if (timeframe === '3 months') return '3 months';
-  if (timeframe === '6 months') return '6 months';
-  if (timeframe === '1 year') return '1 year';
-  if (timeframe === '2 years') return '2 years';
-  if (timeframe === '5 years') return '5 years';
-  if (timeframe === '10 years') return '10 years';
-  return 'Other';
-};
-
-// Map priority to database enum
-const mapPriorityToEnum = (priority: 'low' | 'medium' | 'high'): PriorityType => {
-  if (priority === 'low') return 'Low';
-  if (priority === 'medium') return 'Medium';
-  if (priority === 'high') return 'High';
-  return 'Medium'; // Default fallback
-};
 
 export interface FutureExpense {
-  purpose: string;
+  id?: number;
+  purpose: 'home' | 'education' | 'vehicle' | 'vacation' | 'wedding' | 'healthcare' | 'others';
   amount: number;
-  timeframe: string;
+  timeframe: 'short_term' | 'medium_term' | 'long_term';
   priority: 'low' | 'medium' | 'high';
   notes?: string;
-  id?: number;
 }
 
 export interface UserInfo {
+  id?: string;
   age: number;
-  city: string;
-  riskTolerance?: 'low' | 'medium' | 'high';
+  city: 'metro' | 'tier1' | 'tier2' | 'tier3' | 'overseas';
+  riskTolerance: 'conservative' | 'moderate' | 'aggressive';
   financialGoals?: string[];
+}
+
+export interface ZerodhaCredentials {
+  id?: number;
+  user_id?: string;
+  zerodha_user_id: string;
+  access_token?: string;
+  created_at?: string;
+}
+
+export interface ZerodhaHolding {
+  tradingsymbol: string;
+  exchange: string;
+  isin: string;
+  quantity: number;
+  average_price: number;
+  last_price: number;
+  pnl: number;
+  day_change: number;
+  day_change_percentage: number;
 }
 
 export interface PortfolioData {
   stocks: Stock[];
   mutualFunds: MutualFund[];
   externalInvestments: ExternalInvestment[];
-  expenses: Expense[];
+  expenses: RegularExpense[];
   futureExpenses: FutureExpense[];
   userInfo?: UserInfo;
   lastUpdated: string;
+  zerodhaHoldings?: ZerodhaHolding[];
 }
 
-// Map investment type string to database enum
-const mapInvestmentTypeToEnum = (type: string): InvestmentType => {
-  // Direct mapping based on the exact enum values from the screenshot
-  if (type === 'Gold') return 'Gold';
-  if (type === 'Fixed Deposit') return 'Fixed Deposit';
-  if (type === 'Real Estate') return 'Real Estate';
-  if (type === 'Bank Deposit') return 'Bank Deposit';
-  if (type === 'PPF') return 'PPF';
-  if (type === 'EPF') return 'EPF';
-  if (type === 'National Pension Scheme') return 'National Pension Scheme';
-  if (type === 'Bonds') return 'Bonds';
-  return 'Others'; // Default fallback
-};
-
-// Map expense type string to database enum
-const mapExpenseTypeToEnum = (type: string): ExpenseType => {
-  if (type === 'EMI') return 'EMI';
-  if (type === 'Rent') return 'Rent';
-  if (type === 'School Fees') return 'School Fees';
-  if (type === 'Loan Payment') return 'Loan Payment';
-  if (type === 'Insurance Premium') return 'Insurance Premium';
-  if (type === 'Utility Bills') return 'Utility Bills';
-  if (type === 'Medical') return 'Medical';
-  return 'Others'; // Default fallback
-};
-
-// Map city to database enum to ensure it matches Supabase enum values
-const mapCityToEnum = (city: string): CityEnum => {
-  // Check if the city is already one of the valid enum values
-  if (["Mumbai", "Delhi", "Hyderabad", "Bangalore", "Lucknow", "Other", 
-       "Chennai", "Kolkata", "Pune", "Ahmedabad", "Jaipur"].includes(city)) {
-    return city as CityEnum;
-  }
-  return 'Other'; // Default fallback if it doesn't match any valid option
-};
-
-// Portfolio service using Supabase
 const PortfolioService = {
-  // Get Zerodha portfolio
-  getZerodhaPortfolio: async (): Promise<{ stocks: Stock[]; mutualFunds: MutualFund[] }> => {
+  // Save portfolio data to Supabase
+  savePortfolioData: async (portfolioData: PortfolioData): Promise<PortfolioData> => {
     try {
-      console.log("Fetching Zerodha portfolio data...");
-      
-      // Get the current user session
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        console.error('User not authenticated');
-        throw new Error('User not authenticated');
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) {
+        toast.error('User not logged in');
+        throw new Error('User not logged in');
       }
       
-      // Call the Zerodha portfolio API via Supabase Edge Function with auth token
-      const { data, error } = await supabase.functions.invoke('zerodha-portfolio', {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        }
-      });
+      // Take a snapshot of the portfolio
+      await PortfolioService.takePortfolioSnapshot(portfolioData);
       
-      if (error) {
-        console.error('Error fetching Zerodha portfolio:', error);
-        toast.error(`Failed to fetch Zerodha portfolio: ${error.message}`);
-        throw error;
-      }
-      
-      console.log("Zerodha API response:", data);
-      
-      if (!data || (!data.holdings && !data.positions)) {
-        console.error('No data returned from Zerodha API');
-        toast.error('No data returned from Zerodha API');
-        throw new Error('No data returned from Zerodha API');
-      }
-
-      // Process the portfolio data
-      const stocks: Stock[] = [];
-      const mutualFunds: MutualFund[] = [];
-      
-      // Save portfolio data to database for persistence
-      try {
-        await PortfolioService.savePortfolioToDb(data);
-      } catch (saveError) {
-        console.error('Error saving portfolio to database:', saveError);
-        // Continue with processing even if save fails
-      }
-      
-      // Convert Zerodha holdings to our Stock type
-      if (Array.isArray(data.holdings)) {
-        data.holdings.forEach((holding: any) => {
-          // Check if it's a mutual fund or stock
-          if (holding.tradingsymbol && holding.tradingsymbol.includes('MF')) {
-            mutualFunds.push({
-              name: holding.tradingsymbol,
-              investedAmount: holding.average_price * holding.quantity,
-              currentValue: holding.last_price * holding.quantity,
-              category: 'Mutual Fund' // Zerodha API doesn't provide category, so we use a default
-            });
-          } else {
-            stocks.push({
-              symbol: holding.tradingsymbol,
-              name: holding.tradingsymbol,
-              quantity: holding.quantity,
-              averagePrice: holding.average_price,
-              currentPrice: holding.last_price,
-              sector: holding.sector || 'N/A' // Use sector if available, otherwise N/A
-            });
-          }
-        });
-      }
-      
-      console.log(`Processed ${stocks.length} stocks and ${mutualFunds.length} mutual funds`);
-      
-      return {
-        stocks,
-        mutualFunds
+      const updatedPortfolioData = {
+        ...portfolioData,
+        lastUpdated: new Date().toISOString()
       };
+      
+      return updatedPortfolioData;
     } catch (error) {
-      console.error('Error in getZerodhaPortfolio:', error);
+      console.error('Error saving portfolio data:', error);
+      toast.error('Failed to save portfolio data');
       throw error;
     }
   },
-
-  // Save portfolio data to database for persistence
-  savePortfolioToDb: async (portfolioData: any): Promise<boolean> => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        console.error('User not authenticated');
-        return false;
-      }
-
-      const userId = session.user.id;
-      const now = new Date().toISOString();
-      
-      // Use a TypeScript type assertion to work around the type checking limitation
-      // This is necessary because the portfolio_snapshots table isn't in the generated types yet
-      const { error } = await supabase
-        .from('portfolio_snapshots' as any)
-        .insert({
-          user_id: userId,
-          snapshot_data: portfolioData,
-          snapshot_date: now
-        });
-
-      if (error) {
-        console.error('Error saving portfolio snapshot:', error);
-        return false;
-      }
-
-      console.log('Portfolio snapshot saved successfully');
-      return true;
-    } catch (error) {
-      console.error('Error saving portfolio to database:', error);
-      return false;
-    }
-  },
   
-  // Get latest portfolio snapshot from DB
-  getLatestPortfolioSnapshot: async (): Promise<any | null> => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        return null;
-      }
-      
-      // Use a raw query approach to avoid TypeScript errors
-      const { data, error } = await supabase
-        .from('portfolio_snapshots')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('snapshot_date', { ascending: false })
-        .limit(1)
-        .single();
-      
-      if (error) {
-        console.error("Error fetching portfolio snapshot:", error);
-        return null;
-      }
-      
-      // Cast the data to have the expected properties
-      const snapshotData = data as unknown as {
-        snapshot_data: any;
-      };
-      
-      // Return the snapshot data
-      return snapshotData.snapshot_data || null;
-    } catch (error) {
-      console.error("Error in getLatestPortfolioSnapshot:", error);
-      return null;
-    }
-  },
-  
-  // Get Zerodha login URL from edge function
-  getZerodhaLoginUrl: async (): Promise<string | null> => {
-    try {
-      const { data, error } = await supabase.functions.invoke('zerodha-login-url', {
-        method: 'GET'
-      });
-      
-      if (error) {
-        console.error('Error getting Zerodha login URL:', error);
-        toast.error(`Failed to get Zerodha login URL: ${error.message}`);
-        return null;
-      }
-      
-      if (!data || !data.loginUrl) {
-        console.error('No login URL returned from function');
-        toast.error('No login URL returned from function');
-        return null;
-      }
-      
-      return data.loginUrl;
-    } catch (error: any) {
-      console.error('Error in getZerodhaLoginUrl:', error);
-      toast.error(`Error in getZerodhaLoginUrl: ${error.message || 'Unknown error'}`);
-      return null;
-    }
-  },
-  
-  // Logout from Zerodha by invalidating the access token
-  logoutFromZerodha: async (): Promise<boolean> => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        console.error('User not authenticated');
-        toast.error('You must be logged in to disconnect from Zerodha');
-        return false;
-      }
-
-      // Call edge function to invalidate the token
-      const { data, error } = await supabase.functions.invoke('zerodha-logout', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        }
-      });
-
-      if (error) {
-        console.error('Error logging out from Zerodha:', error);
-        toast.error(`Logout failed: ${error.message}`);
-        return false;
-      }
-
-      // Also remove token from our database
-      const { error: dbError } = await supabase
-        .from('zerodha_credentials')
-        .update({ access_token: null })
-        .eq('user_id', session.user.id);
-
-      if (dbError) {
-        console.error('Error removing token from database:', dbError);
-        // We still consider this a success since the Zerodha token was invalidated
-      }
-
-      return true;
-    } catch (error: any) {
-      console.error('Error in logoutFromZerodha:', error);
-      toast.error(`Error disconnecting: ${error.message || 'Unknown error'}`);
-      return false;
-    }
-  },
-  
-  // Exchange Zerodha request token for access token
-  exchangeZerodhaToken: async (requestToken: string): Promise<boolean> => {
-    try {
-      console.log(`Exchanging Zerodha token: ${requestToken.substring(0, 5)}...`);
-      
-      // Get current session for auth token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        console.error('User not authenticated');
-        toast.error('You must be logged in to connect to Zerodha');
-        return false;
-      }
-      
-      // Call the edge function with auth token
-      const { data, error } = await supabase.functions.invoke('zerodha-exchange-token', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        },
-        body: { request_token: requestToken }
-      });
-      
-      if (error) {
-        console.error('Error exchanging Zerodha token:', error);
-        toast.error(`Token exchange error: ${error.message || 'Unknown error'}`);
-        return false;
-      }
-      
-      console.log('Token exchange response:', data);
-      
-      if (!data || !data.success) {
-        console.error('Token exchange failed:', data?.message || 'Unknown reason');
-        toast.error(`Token exchange failed: ${data?.message || 'Unknown reason'}`);
-        return false;
-      }
-      
-      return true;
-    } catch (error: any) {
-      console.error('Error in exchangeZerodhaToken:', error);
-      toast.error(`Error exchanging token: ${error.message || 'Unknown error'}`);
-      return false;
-    }
-  },
-  
-  // Connect to Zerodha (legacy method for compatibility)
-  connectToZerodha: async (username: string, password: string): Promise<boolean> => {
-    toast.error("This method is deprecated. Please use the 'Login with Zerodha' button instead.");
-    return false;
-  },
-  
-  // Save external investments
-  saveExternalInvestments: async (investments: ExternalInvestment[]): Promise<boolean> => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        toast.error("You must be logged in to save investments");
-        return false;
-      }
-      
-      // First, delete existing investments for this user
-      const { error: deleteError } = await supabase
-        .from('external_investments')
-        .delete()
-        .eq('user_id', user.id);
-      
-      if (deleteError) {
-        console.error("Delete error:", deleteError);
-        toast.error("Failed to update investments");
-        return false;
-      }
-      
-      // Then insert new investments
-      if (investments.length > 0) {
-        // Insert investments one by one to avoid type errors with bulk insert
-        for (const investment of investments) {
-          const formattedInvestment = {
-            user_id: user.id,
-            investment_type: mapInvestmentTypeToEnum(investment.type),
-            investment_name: investment.name,
-            amount: investment.amount,
-            notes: investment.notes || null
-          };
-          
-          console.log("Saving investment:", formattedInvestment); // Debug logging
-          
-          const { error: insertError } = await supabase
-            .from('external_investments')
-            .insert(formattedInvestment);
-          
-          if (insertError) {
-            console.error("Insert error:", insertError);
-            toast.error("Failed to save investment: " + investment.name);
-            return false;
-          }
-        }
-      }
-      
-      toast.success("Investments saved successfully");
-      return true;
-    } catch (error) {
-      console.error("Save investments error:", error);
-      toast.error("Failed to save investments");
-      return false;
-    }
-  },
-  
-  // Get external investments
-  getExternalInvestments: async (): Promise<ExternalInvestment[]> => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        return [];
-      }
-      
-      const { data, error } = await supabase
-        .from('external_investments')
-        .select('*')
-        .eq('user_id', user.id);
-      
-      if (error) {
-        console.error("Fetch error:", error);
-        return [];
-      }
-      
-      return data.map(item => ({
-        id: item.id,
-        type: item.investment_type,
-        name: item.investment_name,
-        amount: item.amount,
-        notes: item.notes
-      }));
-    } catch (error) {
-      console.error("Fetch investments error:", error);
-      return [];
-    }
-  },
-  
-  // Save expenses
-  saveExpenses: async (expenses: Expense[]): Promise<boolean> => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        toast.error("You must be logged in to save expenses");
-        return false;
-      }
-      
-      // First, delete existing expenses for this user
-      const { error: deleteError } = await supabase
-        .from('regular_expenses')
-        .delete()
-        .eq('user_id', user.id);
-      
-      if (deleteError) {
-        console.error("Delete error:", deleteError);
-        toast.error("Failed to update expenses");
-        return false;
-      }
-      
-      // Then insert new expenses
-      if (expenses.length > 0) {
-        // Process each expense individually for better error handling
-        for (const expense of expenses) {
-          const formattedExpense = {
-            user_id: user.id,
-            expense_type: mapExpenseTypeToEnum(expense.type),
-            description: expense.name,
-            amount: expense.amount,
-            frequency: mapFrequencyToEnum(expense.frequency),
-            notes: expense.notes || null
-          };
-          
-          console.log("Saving expense:", formattedExpense); // Debug logging
-          
-          const { error: insertError } = await supabase
-            .from('regular_expenses')
-            .insert(formattedExpense);
-          
-          if (insertError) {
-            console.error("Insert error:", insertError);
-            toast.error("Failed to save expense: " + expense.name);
-            return false;
-          }
-        }
-      }
-      
-      toast.success("Expenses saved successfully");
-      return true;
-    } catch (error) {
-      console.error("Save expenses error:", error);
-      toast.error("Failed to save expenses");
-      return false;
-    }
-  },
-  
-  // Get expenses
-  getExpenses: async (): Promise<Expense[]> => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        return [];
-      }
-      
-      const { data, error } = await supabase
-        .from('regular_expenses')
-        .select('*')
-        .eq('user_id', user.id);
-      
-      if (error) {
-        console.error("Fetch error:", error);
-        return [];
-      }
-      
-      return data.map(item => ({
-        id: item.id,
-        type: item.expense_type,
-        name: item.description,
-        amount: item.amount,
-        frequency: mapEnumToFrequency(item.frequency),
-        notes: item.notes
-      }));
-    } catch (error) {
-      console.error("Fetch expenses error:", error);
-      return [];
-    }
-  },
-  
-  // Save future expenses
-  saveFutureExpenses: async (futureExpenses: FutureExpense[]): Promise<boolean> => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        toast.error("You must be logged in to save future expenses");
-        return false;
-      }
-      
-      // First, delete existing future expenses for this user
-      const { error: deleteError } = await supabase
-        .from('future_expenses')
-        .delete()
-        .eq('user_id', user.id);
-      
-      if (deleteError) {
-        console.error("Delete error:", deleteError);
-        toast.error("Failed to update future expenses");
-        return false;
-      }
-      
-      // Then insert new future expenses
-      if (futureExpenses.length > 0) {
-        // Process each expense individually for better error handling
-        for (const expense of futureExpenses) {
-          // Map to the database schema with proper enum types
-          // Important: Use exact enum values as defined in the database
-          const mappedPurpose = mapPurposeToEnum(expense.purpose);
-          const mappedTimeframe = mapTimeframeToEnum(expense.timeframe);
-          const mappedPriority = mapPriorityToEnum(expense.priority);
-          
-          const formattedExpense = {
-            user_id: user.id,
-            purpose: mappedPurpose,
-            amount: expense.amount,
-            timeframe: mappedTimeframe,
-            priority: mappedPriority,
-            notes: expense.notes || null
-          };
-          
-          console.log("DEBUG - Saving future expense:", {
-            original: expense,
-            formatted: formattedExpense
-          });
-          
-          const { error: insertError } = await supabase
-            .from('future_expenses')
-            .insert(formattedExpense);
-          
-          if (insertError) {
-            console.error("Insert error:", insertError);
-            toast.error("Failed to save future expense: " + expense.purpose);
-            return false;
-          }
-        }
-      }
-      
-      toast.success("Future expenses saved successfully");
-      return true;
-    } catch (error) {
-      console.error("Save future expenses error:", error);
-      toast.error("Failed to save future expenses");
-      return false;
-    }
-  },
-  
-  // Get future expenses
-  getFutureExpenses: async (): Promise<FutureExpense[]> => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        return [];
-      }
-      
-      const { data, error } = await supabase
-        .from('future_expenses')
-        .select('*')
-        .eq('user_id', user.id);
-      
-      if (error) {
-        console.error("Fetch error:", error);
-        return [];
-      }
-      
-      return data.map(item => ({
-        id: item.id,
-        purpose: item.purpose,
-        amount: item.amount,
-        timeframe: item.timeframe,
-        priority: item.priority.toLowerCase() as 'low' | 'medium' | 'high',
-        notes: item.notes
-      }));
-    } catch (error) {
-      console.error("Fetch future expenses error:", error);
-      return [];
-    }
-  },
-  
-  // Save user info
-  saveUserInfo: async (userInfo: UserInfo): Promise<boolean> => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        toast.error("You must be logged in to save personal information");
-        return false;
-      }
-      
-      // For risk_tolerance, match the enum format in database
-      let riskToleranceValue: Database["public"]["Enums"]["risk_tolerance_enum"] | null = null;
-      if (userInfo.riskTolerance === 'low') {
-        riskToleranceValue = "low - safety first";
-      } else if (userInfo.riskTolerance === 'medium') {
-        riskToleranceValue = "medium - balanced apporach";
-      } else if (userInfo.riskTolerance === 'high') {
-        riskToleranceValue = "high - growth focused";
-      }
-      
-      // Ensure city is a valid enum value from the database
-      const cityValue = mapCityToEnum(userInfo.city);
-      
-      console.log("DEBUG - Saving user info:", {
-        userInfo,
-        mappedRiskTolerance: riskToleranceValue,
-        mappedCity: cityValue,
-        financialGoals: userInfo.financialGoals
-      });
-      
-      const dataToUpsert = {
-        id: user.id, // Use user.id as the primary key
-        user_id: user.id,
-        age: userInfo.age,
-        city: cityValue,
-        risk_tolerance: riskToleranceValue,
-        financial_goals: userInfo.financialGoals || []
-      };
-      
-      console.log("DEBUG - Data to upsert:", dataToUpsert);
-      
-      const { error } = await supabase
-        .from('personal_info')
-        .upsert(dataToUpsert);
-      
-      if (error) {
-        console.error("Upsert error:", error);
-        toast.error("Failed to save personal information: " + error.message);
-        return false;
-      }
-      
-      toast.success("Personal information saved successfully");
-      return true;
-    } catch (error) {
-      console.error("Save user info error:", error);
-      toast.error("Failed to save personal information");
-      return false;
-    }
-  },
-  
-  // Get user info
-  getUserInfo: async (): Promise<UserInfo | null> => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        return null;
-      }
-      
-      const { data, error } = await supabase
-        .from('personal_info')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-      
-      if (error) {
-        if (error.code !== 'PGRST116') { // PGRST116 is the error code for "no rows returned"
-          console.error("Fetch error:", error);
-        }
-        return null;
-      }
-      
-      // Map the risk_tolerance from db format to frontend format
-      let riskTolerance: 'low' | 'medium' | 'high' | undefined;
-      if (data.risk_tolerance === 'low - safety first') {
-        riskTolerance = 'low';
-      } else if (data.risk_tolerance === 'medium - balanced apporach') {
-        riskTolerance = 'medium';
-      } else if (data.risk_tolerance === 'high - growth focused') {
-        riskTolerance = 'high';
-      }
-      
-      return {
-        age: data.age,
-        city: data.city,
-        riskTolerance: riskTolerance,
-        financialGoals: data.financial_goals
-      };
-    } catch (error) {
-      console.error("Fetch user info error:", error);
-      return null;
-    }
-  },
-  
-  // Save portfolio data (legacy method for compatibility)
-  savePortfolioData: async (data: Partial<PortfolioData>): Promise<PortfolioData> => {
-    // Handle each data type separately
-    if (data.externalInvestments) {
-      await PortfolioService.saveExternalInvestments(data.externalInvestments);
-    }
-    
-    if (data.expenses) {
-      await PortfolioService.saveExpenses(data.expenses);
-    }
-    
-    if (data.futureExpenses) {
-      await PortfolioService.saveFutureExpenses(data.futureExpenses);
-    }
-    
-    if (data.userInfo) {
-      await PortfolioService.saveUserInfo(data.userInfo);
-    }
-    
-    // Return get portfolio data to maintain compatibility
-    return PortfolioService.getPortfolioData();
-  },
-  
-  // Get portfolio data (legacy method for compatibility)
+  // Get the user's portfolio data
   getPortfolioData: async (): Promise<PortfolioData> => {
     try {
-      // Get all data types
-      const externalInvestments = await PortfolioService.getExternalInvestments();
-      const expenses = await PortfolioService.getExpenses();
-      const futureExpenses = await PortfolioService.getFutureExpenses();
-      const userInfo = await PortfolioService.getUserInfo();
-      
-      // Check if user is connected to Zerodha
-      const { data: { session } } = await supabase.auth.getSession();
-      let stocks: Stock[] = [];
-      let mutualFunds: MutualFund[] = [];
-      
-      if (session?.user) {
-        try {
-          // Check if the user has Zerodha credentials
-          const { data: credentials, error } = await supabase
-            .from('zerodha_credentials')
-            .select('access_token')
-            .eq('user_id', session.user.id)
-            .maybeSingle();
-          
-          console.log('Zerodha credentials check:', { 
-            hasCredentials: !!credentials, 
-            hasToken: !!credentials?.access_token,
-            error: error ? error.message : null 
-          });
-          
-          if (!error && credentials?.access_token) {
-            // User has Zerodha connected, fetch real data
-            try {
-              console.log('Fetching Zerodha portfolio...');
-              const zerodhaData = await PortfolioService.getZerodhaPortfolio();
-              stocks = zerodhaData.stocks;
-              mutualFunds = zerodhaData.mutualFunds;
-              console.log(`Retrieved ${stocks.length} stocks and ${mutualFunds.length} mutual funds`);
-            } catch (zerodhaError: any) {
-              console.error('Error fetching Zerodha portfolio:', zerodhaError);
-              toast.error(`Failed to fetch Zerodha portfolio: ${zerodhaError.message || 'Unknown error'}. Please reconnect your account.`);
-              
-              // Try to get data from the latest snapshot
-              const snapshotData = await PortfolioService.getLatestPortfolioSnapshot();
-              if (snapshotData) {
-                console.log('Using portfolio data from latest snapshot');
-                
-                // Process snapshot data
-                if (Array.isArray(snapshotData.holdings)) {
-                  snapshotData.holdings.forEach((holding: any) => {
-                    if (holding.tradingsymbol && holding.tradingsymbol.includes('MF')) {
-                      mutualFunds.push({
-                        name: holding.tradingsymbol,
-                        investedAmount: holding.average_price * holding.quantity,
-                        currentValue: holding.last_price * holding.quantity,
-                        category: 'Mutual Fund'
-                      });
-                    } else {
-                      stocks.push({
-                        symbol: holding.tradingsymbol,
-                        name: holding.tradingsymbol,
-                        quantity: holding.quantity,
-                        averagePrice: holding.average_price,
-                        currentPrice: holding.last_price,
-                        sector: holding.sector || 'N/A'
-                      });
-                    }
-                  });
-                }
-                
-                console.log(`Retrieved ${stocks.length} stocks and ${mutualFunds.length} mutual funds from snapshot`);
-              }
-            }
-          } else {
-            console.log('User not connected to Zerodha or missing access token');
-          }
-        } catch (credentialsError: any) {
-          console.error('Error checking Zerodha credentials:', credentialsError);
-        }
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) {
+        toast.error('User not logged in');
+        throw new Error('User not logged in');
       }
       
-      return {
-        stocks,
-        mutualFunds,
-        externalInvestments,
-        expenses,
-        futureExpenses,
-        userInfo: userInfo || undefined,
-        lastUpdated: new Date().toISOString()
-      };
-    } catch (error) {
-      console.error('Error in getPortfolioData:', error);
-      // Return empty data as fallback
+      // Try to get the latest portfolio snapshot
+      const snapshotData = await PortfolioService.getLatestPortfolioSnapshot();
+      
+      if (snapshotData) {
+        return snapshotData;
+      }
+
+      // If no snapshot, return empty portfolio structure
       return {
         stocks: [],
         mutualFunds: [],
@@ -949,6 +141,409 @@ const PortfolioService = {
         futureExpenses: [],
         lastUpdated: new Date().toISOString()
       };
+    } catch (error) {
+      console.error('Error fetching portfolio data:', error);
+      toast.error('Failed to load portfolio data');
+      
+      // Return empty portfolio structure
+      return {
+        stocks: [],
+        mutualFunds: [],
+        externalInvestments: [],
+        expenses: [],
+        futureExpenses: [],
+        lastUpdated: new Date().toISOString()
+      };
+    }
+  },
+
+  // Save external investments
+  saveExternalInvestments: async (investments: ExternalInvestment[]): Promise<ExternalInvestment[]> => {
+    try {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) {
+        toast.error('User not logged in');
+        throw new Error('User not logged in');
+      }
+      
+      // Clear existing investments
+      await supabase
+        .from('external_investments')
+        .delete()
+        .eq('user_id', user.id);
+      
+      // Insert new investments
+      if (investments.length > 0) {
+        const { error } = await supabase
+          .from('external_investments')
+          .insert(
+            investments.map((inv, index) => ({
+              id: index + 1,
+              user_id: user.id,
+              investment_name: inv.name,
+              investment_type: inv.type,
+              amount: inv.amount,
+              notes: inv.notes
+            }))
+          );
+          
+        if (error) {
+          console.error('Error saving external investments:', error);
+          toast.error('Failed to save external investments');
+          throw error;
+        }
+      }
+      
+      return investments;
+    } catch (error) {
+      console.error('Error saving external investments:', error);
+      toast.error('Failed to save external investments');
+      throw error;
+    }
+  },
+  
+  // Fetch external investments
+  getExternalInvestments: async (): Promise<ExternalInvestment[]> => {
+    try {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) {
+        return [];
+      }
+      
+      const { data, error } = await supabase
+        .from('external_investments')
+        .select('*')
+        .eq('user_id', user.id);
+      
+      if (error) {
+        console.error('Error fetching external investments:', error);
+        return [];
+      }
+      
+      return data.map(inv => ({
+        id: inv.id,
+        name: inv.investment_name,
+        type: inv.investment_type,
+        amount: inv.amount,
+        notes: inv.notes
+      }));
+    } catch (error) {
+      console.error('Error fetching external investments:', error);
+      return [];
+    }
+  },
+  
+  // Save regular expenses
+  saveRegularExpenses: async (expenses: RegularExpense[]): Promise<RegularExpense[]> => {
+    try {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) {
+        toast.error('User not logged in');
+        throw new Error('User not logged in');
+      }
+      
+      // Clear existing expenses
+      await supabase
+        .from('regular_expenses')
+        .delete()
+        .eq('user_id', user.id);
+      
+      // Insert new expenses
+      if (expenses.length > 0) {
+        const { error } = await supabase
+          .from('regular_expenses')
+          .insert(
+            expenses.map(exp => ({
+              user_id: user.id,
+              description: exp.description,
+              amount: exp.amount,
+              frequency: exp.frequency,
+              expense_type: exp.expense_type,
+              notes: exp.notes
+            }))
+          );
+          
+        if (error) {
+          console.error('Error saving regular expenses:', error);
+          toast.error('Failed to save regular expenses');
+          throw error;
+        }
+      }
+      
+      return expenses;
+    } catch (error) {
+      console.error('Error saving regular expenses:', error);
+      toast.error('Failed to save regular expenses');
+      throw error;
+    }
+  },
+  
+  // Fetch regular expenses
+  getRegularExpenses: async (): Promise<RegularExpense[]> => {
+    try {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) {
+        return [];
+      }
+      
+      const { data, error } = await supabase
+        .from('regular_expenses')
+        .select('*')
+        .eq('user_id', user.id);
+      
+      if (error) {
+        console.error('Error fetching regular expenses:', error);
+        return [];
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Error fetching regular expenses:', error);
+      return [];
+    }
+  },
+  
+  // Save future expenses
+  saveFutureExpenses: async (expenses: FutureExpense[]): Promise<FutureExpense[]> => {
+    try {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) {
+        toast.error('User not logged in');
+        throw new Error('User not logged in');
+      }
+      
+      // Clear existing future expenses
+      await supabase
+        .from('future_expenses')
+        .delete()
+        .eq('user_id', user.id);
+      
+      // Insert new future expenses
+      if (expenses.length > 0) {
+        const { error } = await supabase
+          .from('future_expenses')
+          .insert(
+            expenses.map(exp => ({
+              user_id: user.id,
+              purpose: exp.purpose,
+              amount: exp.amount,
+              timeframe: exp.timeframe,
+              priority: exp.priority,
+              notes: exp.notes
+            }))
+          );
+          
+        if (error) {
+          console.error('Error saving future expenses:', error);
+          toast.error('Failed to save future expenses');
+          throw error;
+        }
+      }
+      
+      return expenses;
+    } catch (error) {
+      console.error('Error saving future expenses:', error);
+      toast.error('Failed to save future expenses');
+      throw error;
+    }
+  },
+  
+  // Fetch future expenses
+  getFutureExpenses: async (): Promise<FutureExpense[]> => {
+    try {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) {
+        return [];
+      }
+      
+      const { data, error } = await supabase
+        .from('future_expenses')
+        .select('*')
+        .eq('user_id', user.id);
+      
+      if (error) {
+        console.error('Error fetching future expenses:', error);
+        return [];
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Error fetching future expenses:', error);
+      return [];
+    }
+  },
+  
+  // Save user info
+  saveUserInfo: async (userInfo: UserInfo): Promise<UserInfo> => {
+    try {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) {
+        toast.error('User not logged in');
+        throw new Error('User not logged in');
+      }
+      
+      // Check if user info exists
+      const { data: existingData } = await supabase
+        .from('personal_info')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (existingData) {
+        // Update existing user info
+        const { error } = await supabase
+          .from('personal_info')
+          .update({
+            age: userInfo.age,
+            city: userInfo.city,
+            risk_tolerance: userInfo.riskTolerance,
+            financial_goals: userInfo.financialGoals || []
+          })
+          .eq('user_id', user.id);
+          
+        if (error) {
+          console.error('Error updating user info:', error);
+          toast.error('Failed to update user information');
+          throw error;
+        }
+      } else {
+        // Insert new user info
+        const { error } = await supabase
+          .from('personal_info')
+          .insert({
+            id: crypto.randomUUID(),
+            user_id: user.id,
+            age: userInfo.age,
+            city: userInfo.city,
+            risk_tolerance: userInfo.riskTolerance,
+            financial_goals: userInfo.financialGoals || []
+          });
+          
+        if (error) {
+          console.error('Error saving user info:', error);
+          toast.error('Failed to save user information');
+          throw error;
+        }
+      }
+      
+      return userInfo;
+    } catch (error) {
+      console.error('Error saving user info:', error);
+      toast.error('Failed to save user information');
+      throw error;
+    }
+  },
+  
+  // Fetch user info
+  getUserInfo: async (): Promise<UserInfo | null> => {
+    try {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) {
+        return null;
+      }
+      
+      const { data, error } = await supabase
+        .from('personal_info')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (error) {
+        console.error('Error fetching user info:', error);
+        return null;
+      }
+      
+      if (!data) {
+        return null;
+      }
+      
+      return {
+        id: data.id,
+        age: data.age,
+        city: data.city,
+        riskTolerance: data.risk_tolerance,
+        financialGoals: data.financial_goals || []
+      };
+    } catch (error) {
+      console.error('Error fetching user info:', error);
+      return null;
+    }
+  },
+  
+  // Take a snapshot of the portfolio
+  takePortfolioSnapshot: async (portfolioData: PortfolioData): Promise<void> => {
+    try {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) {
+        return;
+      }
+      
+      // Save the snapshot
+      await supabase
+        .from('portfolio_snapshots')
+        .insert({
+          user_id: user.id,
+          snapshot_data: portfolioData,
+          snapshot_date: new Date().toISOString()
+        });
+        
+    } catch (error) {
+      console.error('Error taking portfolio snapshot:', error);
+    }
+  },
+  
+  // Get the latest portfolio snapshot
+  getLatestPortfolioSnapshot: async (): Promise<PortfolioData | null> => {
+    try {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) {
+        return null;
+      }
+      
+      // Use a raw query approach to avoid TypeScript errors
+      const { data, error } = await supabase
+        .rpc('get_latest_portfolio_snapshot');
+      
+      if (error || !data) {
+        console.error("Error fetching latest portfolio snapshot:", error);
+        return null;
+      }
+      
+      // Return the snapshot data
+      return data as PortfolioData;
+    } catch (error) {
+      console.error("Error in getLatestPortfolioSnapshot:", error);
+      return null;
+    }
+  },
+  
+  // Check for Zerodha credentials
+  getZerodhaCredentials: async (): Promise<{ hasCredentials: boolean, hasToken: boolean, error: any }> => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        return { hasCredentials: false, hasToken: false, error: new Error('No active session') };
+      }
+
+      const { data, error } = await supabase
+        .from('zerodha_credentials')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .maybeSingle();
+        
+      if (error) {
+        console.error('Error fetching Zerodha credentials:', error);
+        return { hasCredentials: false, hasToken: false, error };
+      }
+
+      return { 
+        hasCredentials: !!data, 
+        hasToken: !!(data && data.access_token),
+        error: null
+      };
+    } catch (error) {
+      console.error('Error in getZerodhaCredentials:', error);
+      return { hasCredentials: false, hasToken: false, error };
     }
   }
 };
