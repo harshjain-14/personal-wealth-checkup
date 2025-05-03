@@ -89,7 +89,7 @@ const PortfolioAnalysisResult = ({ report, onRefresh, isLoading }: PortfolioAnal
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold text-finance-blue">Portfolio Analysis</h2>
-          <p className="text-sm text-gray-500">Generated on {formatDate(report.timestamp)}</p>
+          <p className="text-sm text-gray-500">Generated on {formatDate(report.generatedAt)}</p>
         </div>
         <Button 
           onClick={onRefresh}
@@ -102,207 +102,224 @@ const PortfolioAnalysisResult = ({ report, onRefresh, isLoading }: PortfolioAnal
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="bg-white shadow-sm border-finance-teal/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-medium">Performance Metrics</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500">Total Portfolio Value</span>
-                <span className="text-lg font-semibold">{formatCurrency(report.performanceMetrics.totalValue)}</span>
-              </div>
-              
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500">Profit/Loss</span>
-                <span className={`font-semibold ${report.performanceMetrics.profitLoss >= 0 ? 'text-finance-green' : 'text-finance-red'}`}>
-                  {report.performanceMetrics.profitLoss >= 0 ? '+' : '-'}
-                  {formatCurrency(Math.abs(report.performanceMetrics.profitLoss))}
-                  <span className="text-xs ml-1">
-                    ({report.performanceMetrics.profitLossPercentage >= 0 ? '+' : ''}
-                    {formatPercentage(report.performanceMetrics.profitLossPercentage)})
-                  </span>
-                </span>
-              </div>
-              
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500">CAGR (Est.)</span>
-                <span className="font-medium">{formatPercentage(report.performanceMetrics.cagr || 0)}</span>
-              </div>
-              
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500">IRR (Est.)</span>
-                <span className="font-medium">{formatPercentage(report.performanceMetrics.irr || 0)}</span>
-              </div>
-              
-              {report.performanceMetrics.sharpeRatio && (
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-500">Sharpe Ratio</span>
-                  <span className="font-medium">{report.performanceMetrics.sharpeRatio.toFixed(2)}</span>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white shadow-sm border-finance-teal/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-medium">Sector Breakdown</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[200px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={report.sectorBreakdown}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="totalValue"
-                    nameKey="sector"
-                  >
-                    {report.sectorBreakdown.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => formatCurrency(value as number)} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white shadow-sm border-finance-teal/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-medium">Asset Allocation</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[200px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={report.assetAllocation}
-                  margin={{ top: 20, right: 30, left: 0, bottom: 5 }}
-                >
-                  <Tooltip formatter={(value) => [`${formatPercentage(value as number)}`, 'Allocation']} />
-                  <Bar dataKey="percentage">
-                    {report.assetAllocation.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {report.assetAllocation.map((asset, index) => (
-                <Badge key={index} style={{ backgroundColor: COLORS[index % COLORS.length] }}>
-                  {asset.type}: {formatPercentage(asset.percentage)}
-                </Badge>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="bg-white shadow-sm border-finance-teal/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-medium">Smart Portfolio Insights</CardTitle>
-            <CardDescription>
-              Personalized observations and actionable recommendations
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              {report.insights.map((insight, index) => (
-                <div key={index} className="flex space-x-4 p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
-                  <div className="mt-1">
-                    <InsightIcon type={insight.type} />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-semibold text-gray-900">{insight.title}</h4>
-                      {insight.priority && <InsightPriorityBadge priority={insight.priority} />}
-                    </div>
-                    <p className="text-gray-600">{insight.description}</p>
-                    {insight.actionable && (
-                      <div className="mt-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          className="text-finance-teal hover:bg-finance-teal/10"
-                        >
-                          See Details
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-6">
+      {report.performanceMetrics && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card className="bg-white shadow-sm border-finance-teal/20">
             <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg font-medium">Risk Analysis</CardTitle>
-                <TrendingDown className={`h-5 w-5 ${
-                  report.riskMetrics.volatility.portfolioBeta > 1 
-                    ? 'text-finance-red' 
-                    : 'text-finance-green'
-                }`} />
-              </div>
+              <CardTitle className="text-lg font-medium">Performance Metrics</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500 mb-1">Portfolio Beta</h4>
-                  <div className="text-xl font-semibold">
-                    {report.riskMetrics.volatility.portfolioBeta.toFixed(2)}
-                  </div>
-                  <p className="text-sm text-gray-600 mt-1">
-                    {report.riskMetrics.volatility.marketComparison}
-                  </p>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">Total Portfolio Value</span>
+                  <span className="text-lg font-semibold">{formatCurrency(report.performanceMetrics.totalValue)}</span>
                 </div>
                 
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500 mb-1">Quality Score</h4>
-                  <div className="text-xl font-semibold">
-                    {report.riskMetrics.qualityScore.overall.toFixed(1)}/100
-                  </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">Profit/Loss</span>
+                  <span className={`font-semibold ${report.performanceMetrics.profitLoss >= 0 ? 'text-finance-green' : 'text-finance-red'}`}>
+                    {report.performanceMetrics.profitLoss >= 0 ? '+' : '-'}
+                    {formatCurrency(Math.abs(report.performanceMetrics.profitLoss))}
+                    <span className="text-xs ml-1">
+                      ({report.performanceMetrics.profitLossPercentage >= 0 ? '+' : ''}
+                      {formatPercentage(report.performanceMetrics.profitLossPercentage)})
+                    </span>
+                  </span>
                 </div>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">CAGR (Est.)</span>
+                  <span className="font-medium">{formatPercentage(report.performanceMetrics.cagr || 0)}</span>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">IRR (Est.)</span>
+                  <span className="font-medium">{formatPercentage(report.performanceMetrics.irr || 0)}</span>
+                </div>
+                
+                {report.performanceMetrics.sharpeRatio && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500">Sharpe Ratio</span>
+                    <span className="font-medium">{report.performanceMetrics.sharpeRatio.toFixed(2)}</span>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
 
+          {report.sectorBreakdown && (
+            <Card className="bg-white shadow-sm border-finance-teal/20">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg font-medium">Sector Breakdown</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[200px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={report.sectorBreakdown}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="totalValue"
+                        nameKey="sector"
+                      >
+                        {report.sectorBreakdown.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value) => formatCurrency(value as number)} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="bg-white shadow-sm border-finance-teal/20">
             <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg font-medium">Tax Insights</CardTitle>
-                <IndianRupee className="h-5 w-5 text-emerald-500" />
-              </div>
+              <CardTitle className="text-lg font-medium">Asset Allocation</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500 mb-1">Potential Tax Savings</h4>
-                  <div className="text-xl font-semibold text-emerald-600">
-                    ₹{Math.floor(report.taxInsights.potentialSavings/1000)}K
-                  </div>
-                </div>
-                <ul className="list-disc pl-5 space-y-2">
-                  {report.taxInsights.suggestions.map((suggestion, index) => (
-                    <li key={index} className="text-sm text-gray-600">{suggestion}</li>
-                  ))}
-                </ul>
+              <div className="h-[200px]">
+                {report.assetAllocation && report.assetAllocation.currentAllocation && (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={Object.entries(report.assetAllocation.currentAllocation).map(([type, percentage]) => ({
+                        type,
+                        percentage
+                      }))}
+                      margin={{ top: 20, right: 30, left: 0, bottom: 5 }}
+                    >
+                      <Tooltip formatter={(value) => [`${formatPercentage(value as number)}`, 'Allocation']} />
+                      <Bar dataKey="percentage">
+                        {Object.keys(report.assetAllocation.currentAllocation).map((_, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {report.assetAllocation && report.assetAllocation.currentAllocation && 
+                  Object.entries(report.assetAllocation.currentAllocation).map(([type, percentage], index) => (
+                    <Badge key={index} style={{ backgroundColor: COLORS[index % COLORS.length] }}>
+                      {type}: {formatPercentage(percentage)}
+                    </Badge>
+                  ))
+                }
               </div>
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {report.insights && (
+          <Card className="bg-white shadow-sm border-finance-teal/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg font-medium">Smart Portfolio Insights</CardTitle>
+              <CardDescription>
+                Personalized observations and actionable recommendations
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {report.insights.map((insight, index) => (
+                  <div key={index} className="flex space-x-4 p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                    <div className="mt-1">
+                      <InsightIcon type={insight.type} />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-semibold text-gray-900">{insight.title}</h4>
+                        {insight.priority && <InsightPriorityBadge priority={insight.priority} />}
+                      </div>
+                      <p className="text-gray-600">{insight.description}</p>
+                      {insight.actionable && (
+                        <div className="mt-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="text-finance-teal hover:bg-finance-teal/10"
+                          >
+                            See Details
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <div className="space-y-6">
+          {report.riskMetrics && (
+            <Card className="bg-white shadow-sm border-finance-teal/20">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg font-medium">Risk Analysis</CardTitle>
+                  <TrendingDown className={`h-5 w-5 ${
+                    report.riskMetrics.volatility.portfolioBeta > 1 
+                      ? 'text-finance-red' 
+                      : 'text-finance-green'
+                  }`} />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-500 mb-1">Portfolio Beta</h4>
+                    <div className="text-xl font-semibold">
+                      {report.riskMetrics.volatility.portfolioBeta.toFixed(2)}
+                    </div>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {report.riskMetrics.volatility.marketComparison}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-500 mb-1">Quality Score</h4>
+                    <div className="text-xl font-semibold">
+                      {report.riskMetrics.qualityScore.overall.toFixed(1)}/100
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {report.taxInsights && (
+            <Card className="bg-white shadow-sm border-finance-teal/20">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg font-medium">Tax Insights</CardTitle>
+                  <IndianRupee className="h-5 w-5 text-emerald-500" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-500 mb-1">Potential Tax Savings</h4>
+                    <div className="text-xl font-semibold text-emerald-600">
+                      ₹{Math.floor(report.taxInsights.potentialSavings/1000)}K
+                    </div>
+                  </div>
+                  <ul className="list-disc pl-5 space-y-2">
+                    {report.taxInsights.suggestions.map((suggestion, index) => (
+                      <li key={index} className="text-sm text-gray-600">{suggestion}</li>
+                    ))}
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 

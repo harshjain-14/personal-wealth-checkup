@@ -44,6 +44,45 @@ export interface AnalysisReport {
   emergencyFund: AnalysisSection;
   scoring: ScoringSection;
   generatedAt: string;
+  // Additional fields needed by PortfolioAnalysisResult
+  performanceMetrics: {
+    totalValue: number;
+    profitLoss: number;
+    profitLossPercentage: number;
+    cagr: number;
+    irr: number;
+    sharpeRatio?: number;
+  };
+  sectorBreakdown: Array<{sector: string; totalValue: number}>;
+  insights: Array<PortfolioInsight>;
+  riskMetrics: {
+    volatility: {
+      portfolioBeta: number;
+      marketComparison: string;
+    };
+    qualityScore: {
+      overall: number;
+    };
+  };
+  taxInsights: {
+    potentialSavings: number;
+    suggestions: string[];
+  };
+  timestamp?: string;
+}
+
+// Define types needed by the PortfolioAnalysisResult component
+export interface PortfolioInsight {
+  type: 'strength' | 'warning' | 'suggestion' | 'tax' | 'goal' | 'volatility';
+  title: string;
+  description: string;
+  priority?: 'high' | 'medium' | 'low';
+  actionable?: boolean;
+}
+
+export interface AssetAllocationItem {
+  type: string;
+  percentage: number;
 }
 
 // Create a service for portfolio analysis
@@ -99,14 +138,12 @@ const AnalysisService = {
         return;
       }
 
-      // Store the analysis in the database
-      const { error } = await supabase
-        .from('portfolio_analysis')
-        .insert({
-          user_id: user.id,
-          analysis_data: analysis,
-          generated_at: analysis.generatedAt
-        });
+      // Use RPC function instead of direct table operations
+      const { error } = await supabase.rpc('save_portfolio_analysis', {
+        analysis_data: analysis,
+        user_id_input: user.id,
+        generated_at_input: analysis.generatedAt
+      });
 
       if (error) {
         console.error("Error saving analysis:", error);
@@ -127,14 +164,10 @@ const AnalysisService = {
         return null;
       }
 
-      // Query the latest analysis directly instead of using RPC
-      const { data, error } = await supabase
-        .from('portfolio_analysis')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('generated_at', { ascending: false })
-        .limit(1)
-        .single();
+      // Use RPC function instead of direct table operations
+      const { data, error } = await supabase.rpc('get_latest_portfolio_analysis', {
+        user_id_input: user.id
+      });
 
       if (error) {
         console.error("Error fetching latest analysis:", error);
@@ -160,23 +193,21 @@ const AnalysisService = {
         return [];
       }
 
-      // Get all analyses for the user
-      const { data, error } = await supabase
-        .from('portfolio_analysis')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('generated_at', { ascending: false });
+      // Use RPC function instead of direct table operations
+      const { data, error } = await supabase.rpc('get_all_portfolio_analyses', {
+        user_id_input: user.id
+      });
 
       if (error) {
         console.error("Error fetching analyses:", error);
         return [];
       }
 
-      if (!data?.length) {
+      if (!data || !data.length) {
         return [];
       }
 
-      return data.map(item => item.analysis_data as AnalysisReport);
+      return data.map((item: any) => item.analysis_data as AnalysisReport);
     } catch (error) {
       console.error("Error in getAllAnalyses:", error);
       return [];

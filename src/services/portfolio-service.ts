@@ -116,8 +116,8 @@ const mapExpenseFrequencyForDb = (frequency: ExpenseFrequency): Database["public
 };
 
 const mapExpenseTypeForDb = (type: ExpenseType): Database["public"]["Enums"]["expense_type"] => {
-  // The types should directly match the database enum
-  return type as Database["public"]["Enums"]["expense_type"];
+  // The types should directly match the database enum, with exact casing
+  return type as unknown as Database["public"]["Enums"]["expense_type"];
 };
 
 const mapFuturePurposeForDb = (purpose: FuturePurpose): Database["public"]["Enums"]["future_purpose"] => {

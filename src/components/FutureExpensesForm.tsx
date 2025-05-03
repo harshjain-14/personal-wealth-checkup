@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -134,6 +134,11 @@ const FutureExpensesForm = ({ futureExpenses, onSave }: FutureExpensesFormProps)
     notes: ''
   });
   const [customTimeframe, setCustomTimeframe] = useState('');
+
+  // Update the list when props change to ensure data consistency
+  useEffect(() => {
+    setFutureExpensesList(futureExpenses || []);
+  }, [futureExpenses]);
 
   const handleAddExpense = () => {
     if (!newExpense.purpose || !newExpense.amount || newExpense.amount <= 0 || !newExpense.timeframe) {

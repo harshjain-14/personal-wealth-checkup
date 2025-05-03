@@ -1,66 +1,20 @@
 
+# This file controls the behavior of the Edge Functions runtime.
+# For the top level configuration, see the Edge Functions documentation:
+# https://supabase.com/docs/guides/functions/edge-functions
+
 project_id = "dihdiemqnmalievpvqfh"
 
-[api]
-enabled = true
-port = 54321
-schemas = ["public", "storage", "graphql_public"]
-
-[db]
-port = 54322
-shadow_port = 54320
-major_version = 15
-
-[realtime]
-enabled = true
-
-[studio]
-enabled = true
-port = 54323
-api_url = "http://localhost"
-
-[inbucket]
-enabled = true
-port = 54324
-
-[storage]
-enabled = true
-
-[auth]
-enabled = true
-site_url = "http://localhost:3000"
-
-[auth.email]
-enable_signup = true
-double_confirm_changes = true
-enable_confirmations = false
-
-[auth.sms]
-enable_signup = true
-enable_confirmations = true
-
-[auth.external.github]
-enabled = false
-client_id = ""
-secret = ""
-redirect_uri = ""
-url = ""
-
-[auth.external.google]
-enabled = false
-client_id = ""
-secret = ""
-redirect_uri = ""
-url = ""
-
-[functions]
 [functions.portfolio-analysis]
 verify_jwt = true
 
-[functions.zerodha-login-url]
-verify_jwt = false
+[functions.seed-data]
+verify_jwt = true
 
 [functions.zerodha-exchange-token]
+verify_jwt = false
+
+[functions.zerodha-login-url]
 verify_jwt = false
 
 [functions.zerodha-logout]

@@ -60,16 +60,13 @@ const DataEntryTabs = ({ portfolioData, onDataSaved, onAnalysisRequest }: DataEn
       // Save external investments
       await PortfolioService.saveExternalInvestments(investments);
       
-      // Get updated portfolio data (all data, not just investments)
-      const updatedData = {
-        ...portfolioData,
-        externalInvestments: investments,
-        lastUpdated: new Date().toISOString()
-      };
+      // Get updated portfolio data (with refreshed data)
+      const updatedData = await PortfolioService.getPortfolioData();
       
       // Update local state through parent component
       onDataSaved(updatedData);
       
+      toast.success('External investments saved successfully');
       console.log("External investments saved and data updated");
     } catch (error) {
       console.error('Error saving external investments:', error);
@@ -84,14 +81,11 @@ const DataEntryTabs = ({ portfolioData, onDataSaved, onAnalysisRequest }: DataEn
     try {
       await PortfolioService.saveExpenses(expenses);
       
-      // Update local state without full reload
-      const updatedData = {
-        ...portfolioData,
-        expenses: expenses,
-        lastUpdated: new Date().toISOString()
-      };
+      // Get fresh data from the server
+      const updatedData = await PortfolioService.getPortfolioData();
       
       onDataSaved(updatedData);
+      toast.success('Expenses saved successfully');
     } catch (error) {
       console.error('Error saving expenses:', error);
       toast.error('Failed to save expenses');
@@ -105,14 +99,11 @@ const DataEntryTabs = ({ portfolioData, onDataSaved, onAnalysisRequest }: DataEn
     try {
       await PortfolioService.saveFutureExpenses(futureExpenses);
       
-      // Update local state without full reload
-      const updatedData = {
-        ...portfolioData,
-        futureExpenses: futureExpenses,
-        lastUpdated: new Date().toISOString()
-      };
+      // Get fresh data from the server
+      const updatedData = await PortfolioService.getPortfolioData();
       
       onDataSaved(updatedData);
+      toast.success('Future expenses saved successfully');
     } catch (error) {
       console.error('Error saving future expenses:', error);
       toast.error('Failed to save future expenses');
@@ -126,14 +117,11 @@ const DataEntryTabs = ({ portfolioData, onDataSaved, onAnalysisRequest }: DataEn
     try {
       await PortfolioService.saveUserInfo(userInfo);
       
-      // Update local state without full reload
-      const updatedData = {
-        ...portfolioData,
-        userInfo: userInfo,
-        lastUpdated: new Date().toISOString()
-      };
+      // Get fresh data from the server
+      const updatedData = await PortfolioService.getPortfolioData();
       
       onDataSaved(updatedData);
+      toast.success('User information saved successfully');
     } catch (error) {
       console.error('Error saving user info:', error);
       toast.error('Failed to save user information');

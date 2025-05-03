@@ -20,7 +20,7 @@ interface ExpensesFormProps {
   onSave: (expenses: Expense[]) => void;
 }
 
-const EXPENSE_TYPES = [
+const EXPENSE_TYPES: ExpenseType[] = [
   'EMI',
   'Rent',
   'School Fees',
@@ -41,7 +41,7 @@ const FREQUENCY_OPTIONS: { value: ExpenseFrequency; label: string }[] = [
 const ExpensesForm = ({ expenses, onSave }: ExpensesFormProps) => {
   const [expensesList, setExpensesList] = useState<Expense[]>(expenses || []);
   const [newExpense, setNewExpense] = useState<Expense>({
-    type: EXPENSE_TYPES[0],
+    type: 'EMI',
     name: '',
     amount: 0,
     frequency: 'monthly',
@@ -61,7 +61,7 @@ const ExpensesForm = ({ expenses, onSave }: ExpensesFormProps) => {
 
     setExpensesList([...expensesList, { ...newExpense, amount: Number(newExpense.amount) }]);
     setNewExpense({
-      type: EXPENSE_TYPES[0],
+      type: 'EMI',
       name: '',
       amount: 0,
       frequency: 'monthly',
@@ -136,7 +136,7 @@ const ExpensesForm = ({ expenses, onSave }: ExpensesFormProps) => {
                   <Label htmlFor="expenseType">Type</Label>
                   <Select 
                     value={newExpense.type} 
-                    onValueChange={(value) => setNewExpense({...newExpense, type: value})}
+                    onValueChange={(value: ExpenseType) => setNewExpense({...newExpense, type: value})}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select type" />
