@@ -1,7 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.1.0";
-import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
@@ -61,7 +60,8 @@ serve(async (req) => {
         throw new Error("No request token provided");
       }
       console.log("Received request token:", requestToken.substring(0, 5) + "***");
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Error parsing request body:", error);
       return new Response(
         JSON.stringify({ success: false, message: "Invalid request: " + error.message }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -72,7 +72,9 @@ serve(async (req) => {
     const authHeader = req.headers.get('Authorization') || '';
     const token = authHeader.replace('Bearer ', '');
     
+    // Check if token is present
     if (!token) {
+      console.error("No authorization token provided");
       return new Response(
         JSON.stringify({ success: false, message: "Authentication required" }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -99,93 +101,105 @@ serve(async (req) => {
     console.log(`Authenticated user: ${user.id}`);
 
     // Generate checksum for Zerodha API
-    const checksum = await generateChecksum(KITE_API_KEY, requestToken, KITE_API_SECRET);
-    console.log("Generated checksum (first 10 chars):", checksum.substring(0, 10) + "***");
-    
-    // Prepare body for Zerodha API request
-    const formData = new URLSearchParams();
-    formData.append("api_key", KITE_API_KEY);
-    formData.append("request_token", requestToken);
-    formData.append("checksum", checksum);
-
-    // Exchange request token for access token with Zerodha
-    const zerodhaResponse = await fetch("https://api.kite.trade/session/token", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "X-Kite-Version": "3"
-      },
-      body: formData.toString()
-    });
-
-    const responseText = await zerodhaResponse.text();
-    let responseData;
-
     try {
-      responseData = JSON.parse(responseText);
-    } catch (e) {
-      console.error("Failed to parse Zerodha response:", responseText);
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: `Failed to parse Zerodha response: ${zerodhaResponse.status}`,
-          details: responseText
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+      const checksum = await generateChecksum(KITE_API_KEY, requestToken, KITE_API_SECRET);
+      console.log("Generated checksum (first 10 chars):", checksum.substring(0, 10) + "***");
+      
+      // Prepare body for Zerodha API request
+      const formData = new URLSearchParams();
+      formData.append("api_key", KITE_API_KEY);
+      formData.append("request_token", requestToken);
+      formData.append("checksum", checksum);
 
-    if (!zerodhaResponse.ok) {
-      console.error(`Zerodha API error: ${zerodhaResponse.status} - ${JSON.stringify(responseData)}`);
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: `Zerodha API error: ${zerodhaResponse.status}`,
-          details: responseData
-        }),
-        { status: zerodhaResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Extract access token from response
-    console.log("Zerodha response data:", JSON.stringify(responseData).substring(0, 100) + "...");
-
-    if (!responseData.data || !responseData.data.access_token) {
-      console.error("No access token in response:", responseData);
-      return new Response(
-        JSON.stringify({ success: false, message: "Access token not found in response" }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const accessToken = responseData.data.access_token;
-    const zerodhaUserId = responseData.data.user_id.toString();
-
-    // Store token in database
-    const { error: upsertError } = await supabaseAdmin
-      .from('zerodha_credentials')
-      .upsert({
-        user_id: user.id,
-        zerodha_user_id: zerodhaUserId,
-        access_token: accessToken
+      // Exchange request token for access token with Zerodha
+      console.log("Sending token exchange request to Zerodha...");
+      const zerodhaResponse = await fetch("https://api.kite.trade/session/token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "X-Kite-Version": "3"
+        },
+        body: formData.toString()
       });
 
-    if (upsertError) {
-      console.error("Error storing credentials:", upsertError);
+      const responseText = await zerodhaResponse.text();
+      let responseData;
+
+      try {
+        responseData = JSON.parse(responseText);
+        console.log("Zerodha API response status:", zerodhaResponse.status);
+        console.log("Zerodha API response:", JSON.stringify(responseData).substring(0, 200) + "...");
+      } catch (e) {
+        console.error("Failed to parse Zerodha response:", responseText);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            message: `Failed to parse Zerodha response: ${zerodhaResponse.status}`,
+            details: responseText
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (!zerodhaResponse.ok) {
+        console.error(`Zerodha API error: ${zerodhaResponse.status} - ${JSON.stringify(responseData)}`);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            message: `Zerodha API error: ${zerodhaResponse.status}`,
+            details: responseData
+          }),
+          { status: zerodhaResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Extract access token from response
+      if (!responseData.data || !responseData.data.access_token) {
+        console.error("No access token in response:", responseData);
+        return new Response(
+          JSON.stringify({ success: false, message: "Access token not found in response" }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const accessToken = responseData.data.access_token;
+      const zerodhaUserId = responseData.data.user_id.toString();
+      
+      console.log(`Got access token for Zerodha user ID: ${zerodhaUserId}`);
+
+      // Store token in database
+      const { error: upsertError } = await supabaseAdmin
+        .from('zerodha_credentials')
+        .upsert({
+          user_id: user.id,
+          zerodha_user_id: zerodhaUserId,
+          access_token: accessToken
+        });
+
+      if (upsertError) {
+        console.error("Error storing credentials:", upsertError);
+        return new Response(
+          JSON.stringify({ success: false, message: `Failed to store credentials: ${upsertError.message}` }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log("Successfully stored Zerodha credentials");
       return new Response(
-        JSON.stringify({ success: false, message: `Failed to store credentials: ${upsertError.message}` }),
+        JSON.stringify({
+          success: true,
+          message: "Successfully connected to Zerodha"
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } catch (error: any) {
+      console.error("Error in token exchange process:", error);
+      return new Response(
+        JSON.stringify({ success: false, message: error.message || "Error during token exchange" }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: "Successfully connected to Zerodha"
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  } catch (error) {
+  } catch (error: any) {
     console.error("Unexpected error:", error);
     return new Response(
       JSON.stringify({ success: false, message: error.message || "Unexpected error occurred" }),

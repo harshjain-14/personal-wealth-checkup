@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -53,19 +52,31 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
       setError(null);
       try {
         console.log("Received request token from popup:", event.data.requestToken.substring(0, 5) + "...");
-        // Exchange request token for access token
-        const success = await PortfolioService.exchangeZerodhaToken(event.data.requestToken);
         
-        console.log("Token exchange result:", success);
+        // Get current session token
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          throw new Error("No active session found. Please login again.");
+        }
         
-        if (success) {
+        // Exchange request token for access token with server-side function
+        const { data, error } = await supabase.functions.invoke('zerodha-exchange-token', {
+          body: { request_token: event.data.requestToken }
+        });
+        
+        console.log("Token exchange result:", data);
+        
+        if (error) {
+          throw new Error(`API Error: ${error.message}`);
+        }
+        
+        if (data?.success) {
           toast.success('Connected to Zerodha successfully');
           setIsConnected(true);
           setShowPortfolio(false); // Reset when reconnected
         } else {
-          const errorMessage = 'Failed to connect to Zerodha. Please try again.';
-          setError(errorMessage);
-          toast.error(errorMessage);
+          const errorMessage = data?.message || 'Failed to connect to Zerodha. Please try again.';
+          throw new Error(errorMessage);
         }
       } catch (error: any) {
         console.error('Zerodha token exchange error:', error);
@@ -96,10 +107,10 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
     
     try {
       // Get the Zerodha login URL from Supabase function
-      const url = await PortfolioService.getZerodhaLoginUrl();
+      const { data, error } = await supabase.functions.invoke('zerodha-login-url');
       
-      if (!url) {
-        const errorMessage = 'Failed to generate Zerodha login URL. Please try again later.';
+      if (error || !data?.loginUrl) {
+        const errorMessage = error?.message || 'Failed to generate Zerodha login URL. Please try again later.';
         console.error(errorMessage);
         setError(errorMessage);
         toast.error(errorMessage);
@@ -107,6 +118,7 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
         return;
       }
       
+      const url = data.loginUrl;
       console.log("Opening Zerodha login with URL:", url);
       
       // Open Zerodha login popup
@@ -161,13 +173,18 @@ const ZerodhaConnector = ({ onConnect }: ZerodhaConnectorProps) => {
   const handleLogoutZerodha = async () => {
     setIsLogoutLoading(true);
     try {
-      const success = await PortfolioService.logoutFromZerodha();
-      if (success) {
+      const { data, error } = await supabase.functions.invoke('zerodha-logout');
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      if (data?.success) {
         toast.success('Disconnected from Zerodha successfully');
         setIsConnected(false);
         setShowPortfolio(false);
       } else {
-        toast.error('Failed to disconnect from Zerodha');
+        throw new Error(data?.message || 'Failed to disconnect from Zerodha');
       }
     } catch (error: any) {
       console.error('Zerodha logout error:', error);
