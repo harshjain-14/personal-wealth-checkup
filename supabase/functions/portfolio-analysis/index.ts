@@ -1,392 +1,417 @@
 
+// Edge function for generating portfolio analysis with Claude API
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.1.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const CLAUDE_API_KEY = Deno.env.get("CLAUDE_API_KEY") || "";
+const CLAUDE_API_URL = "https://api.anthropic.com/v1/messages";
 
-// CORS headers
+// Helper function to format currency
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-IN', { 
+    style: 'currency', 
+    currency: 'INR',
+    maximumFractionDigits: 0
+  }).format(amount);
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 serve(async (req) => {
-  // Handle preflight CORS
+  // CORS preflight handler
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
-
+  
   try {
-    // Check for required environment variables
+    // Check for Claude API key
     if (!CLAUDE_API_KEY) {
-      console.error("CLAUDE_API_KEY environment variable not set");
+      console.error("Missing CLAUDE_API_KEY environment variable");
       return new Response(
-        JSON.stringify({
-          error: "Server configuration error: CLAUDE_API_KEY not set"
-        }),
+        JSON.stringify({ error: "Server configuration error: Missing API key" }),
         {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
-
-    // Get the authorization header
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "Missing authorization header" }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
-
-    // Extract the token
-    const token = authHeader.replace('Bearer ', '');
     
-    // Initialize Supabase admin client
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    
-    // Verify the token and get user
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: "Invalid user token" }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
-    
-    // Parse the request body
-    let portfolioData;
-    try {
-      const requestData = await req.json();
-      portfolioData = requestData.portfolioData;
-    
-      if (!portfolioData) {
-        return new Response(
-          JSON.stringify({ error: "Missing portfolio data" }),
-          { 
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
+    // Create Supabase client
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: req.headers.get('Authorization')! },
+        },
       }
-    } catch (parseError) {
+    );
+    
+    // Verify authentication
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    
+    if (userError || !user) {
+      console.error("Authentication error:", userError);
       return new Response(
-        JSON.stringify({ error: `Error parsing request: ${parseError.message}` }),
+        JSON.stringify({ error: "Authentication required" }),
+        { 
+          status: 401, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+    
+    // Parse request body
+    let body;
+    try {
+      body = await req.json();
+    } catch (e) {
+      console.error("Error parsing request body:", e);
+      return new Response(
+        JSON.stringify({ error: "Invalid request format" }),
         { 
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
-
-    // Create a summarized portfolio for Claude
-    const { 
-      stocks = [], 
-      mutualFunds = [], 
-      externalInvestments = [], 
-      expenses = [], 
-      futureExpenses = [], 
-      userInfo,
-      zerodhaHoldings = []
-    } = portfolioData;
-
-    // Add Zerodha holdings to stocks array for analysis
-    const combinedStocks = [...stocks];
     
-    if (zerodhaHoldings && zerodhaHoldings.length > 0) {
-      zerodhaHoldings.forEach(holding => {
-        // Check if this holding already exists in the stocks array
-        const existingStock = combinedStocks.find(stock => 
-          stock.symbol === holding.tradingsymbol
-        );
-        
-        if (!existingStock) {
-          // Add as a new stock
-          combinedStocks.push({
-            symbol: holding.tradingsymbol,
-            name: holding.tradingsymbol, // Use the trading symbol as name since we don't have company name
-            quantity: holding.quantity,
-            averagePrice: holding.average_price,
-            currentPrice: holding.last_price,
-            sector: 'Unknown' // We don't have sector info from Zerodha API
-          });
+    const portfolioData = body.portfolioData;
+    
+    if (!portfolioData) {
+      console.error("No portfolio data provided");
+      return new Response(
+        JSON.stringify({ error: "Portfolio data is required" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
-      });
+      );
     }
-
-    // Calculate total values for summary
-    const stocksValue = combinedStocks.reduce((total, stock) => total + (stock.quantity * stock.currentPrice), 0);
-    const mutualFundsValue = mutualFunds.reduce((total, fund) => total + fund.currentValue, 0);
-    const externalValue = externalInvestments.reduce((total, inv) => total + inv.amount, 0);
+    
+    console.log("Received portfolio data for analysis");
+    
+    // Prepare data for Claude
+    const userInfo = portfolioData.userInfo || {};
+    const stocks = portfolioData.stocks || [];
+    const mutualFunds = portfolioData.mutualFunds || [];
+    const externalInvestments = portfolioData.externalInvestments || [];
+    const expenses = portfolioData.expenses || [];
+    const futureExpenses = portfolioData.futureExpenses || [];
+    const zerodhaHoldings = portfolioData.zerodhaHoldings || [];
+    
+    // Calculate portfolio metrics
+    const totalStocksValue = stocks.reduce((sum, stock) => sum + (stock.quantity * stock.currentPrice), 0);
+    const totalMFValue = mutualFunds.reduce((sum, mf) => sum + mf.currentValue, 0);
+    const totalExternalValue = externalInvestments.reduce((sum, inv) => sum + inv.amount, 0);
+    const totalPortfolioValue = totalStocksValue + totalMFValue + totalExternalValue;
+    
     const monthlyExpenses = expenses
-      .filter(e => e.frequency === 'monthly')
-      .reduce((total, e) => total + e.amount, 0);
-    const quarterlyExpenses = expenses
-      .filter(e => e.frequency === 'quarterly')
-      .reduce((total, e) => total + e.amount, 0);
-    const yearlyExpenses = expenses
-      .filter(e => e.frequency === 'yearly')
-      .reduce((total, e) => total + e.amount, 0);
+      .filter(expense => expense.frequency === 'monthly')
+      .reduce((sum, expense) => sum + expense.amount, 0);
     
-    const totalPortfolioValue = stocksValue + mutualFundsValue + externalValue;
-    const annualExpenses = monthlyExpenses * 12 + quarterlyExpenses * 4 + yearlyExpenses;
-    const plannedFutureExpenses = futureExpenses.reduce((total, exp) => total + exp.amount, 0);
-
-    console.log("Preparing portfolio analysis request to Claude API");
-    
-    // Create a structured request to Claude
-    const message = `
-      I need a detailed financial portfolio analysis based on the following data:
-
-      ## User Information
-      ${userInfo ? `
-      - Age: ${userInfo.age}
-      - City: ${userInfo.city}
-      - Risk Tolerance: ${userInfo.riskTolerance || 'Not specified'}
-      - Financial Goals: ${userInfo.financialGoals?.join(', ') || 'Not specified'}
-      ` : 'No user information provided'}
-
-      ## Portfolio Summary
-      - Total Portfolio Value: ₹${totalPortfolioValue.toFixed(2)}
-      - Annual Expenses: ₹${annualExpenses.toFixed(2)}
-      - Planned Future Expenses: ₹${plannedFutureExpenses.toFixed(2)}
-
-      ## Investments Breakdown
-      - Stocks: ${combinedStocks.length} holdings worth ₹${stocksValue.toFixed(2)}
-      - Mutual Funds: ${mutualFunds.length} funds worth ₹${mutualFundsValue.toFixed(2)}
-      - External Investments: ${externalInvestments.length} investments worth ₹${externalValue.toFixed(2)}
-
-      ## Detailed Stock Holdings
-      ${combinedStocks.map(s => `- ${s.name} (${s.symbol}): ${s.quantity} shares at avg. price ₹${s.averagePrice}, current price ₹${s.currentPrice}, sector: ${s.sector}`).join('\n')}
-
-      ## Detailed Mutual Fund Holdings
-      ${mutualFunds.map(f => `- ${f.name}: invested ₹${f.investedAmount}, current value ₹${f.currentValue}, category: ${f.category}`).join('\n')}
-
-      ## External Investments
-      ${externalInvestments.map(i => `- ${i.name} (${i.type}): ₹${i.amount} ${i.notes ? `- ${i.notes}` : ''}`).join('\n')}
-
-      ## Regular Expenses
-      ${expenses.map(e => `- ${e.name} (${e.type}): ₹${e.amount} (${e.frequency}) ${e.notes ? `- ${e.notes}` : ''}`).join('\n')}
-
-      ## Future Expenses
-      ${futureExpenses.map(e => `- ${e.purpose}: ₹${e.amount} within ${e.timeframe}, priority: ${e.priority} ${e.notes ? `- ${e.notes}` : ''}`).join('\n')}
-
-      Please provide a comprehensive analysis with the following sections structured exactly as specified:
-
-      1. A summary overview of the portfolio
-      2. Performance metrics that include totalValue (number), profitLoss (number), profitLossPercentage (number), cagr (number), irr (number), and sharpeRatio (number if available)
-      3. Asset allocation as an array of items with type (string), percentage (number), and value (number)
-      4. Sector breakdown as an array of items with sector (string), totalValue (number), and percentage (number)
-      5. Risk metrics with volatility (containing portfolioBeta as number and marketComparison as string) and qualityScore (containing overall as number, and optionally stability, growth, and value as numbers)
-      6. Insights as an array of items with type (one of: 'strength', 'warning', 'suggestion', 'tax', 'goal', 'volatility'), title (string), description (string), optional priority ('low', 'medium', or 'high'), and optional actionable (boolean)
-      7. Tax insights with potentialSavings (number) and suggestions (array of strings)
-      8. Key recommendations as an array of strings
-      9. Action items as an array of strings
-
-      Structure the response in a JSON format with this exact structure:
-      {
-        "summary": "Brief overview of the portfolio",
-        "performanceMetrics": {
-          "totalValue": 100000,
-          "profitLoss": 5000,
-          "profitLossPercentage": 5,
-          "cagr": 8,
-          "irr": 7,
-          "sharpeRatio": 0.8
-        },
-        "assetAllocation": [
-          {"type": "Equities", "percentage": 40, "value": 40000},
-          {"type": "Mutual Funds", "percentage": 30, "value": 30000},
-          {"type": "Fixed Deposits", "percentage": 20, "value": 20000},
-          {"type": "Others", "percentage": 10, "value": 10000}
-        ],
-        "sectorBreakdown": [
-          {"sector": "Technology", "totalValue": 25000, "percentage": 25},
-          {"sector": "Financial", "totalValue": 30000, "percentage": 30},
-          {"sector": "Healthcare", "totalValue": 15000, "percentage": 15},
-          {"sector": "Consumer", "totalValue": 20000, "percentage": 20},
-          {"sector": "Others", "totalValue": 10000, "percentage": 10}
-        ],
-        "riskMetrics": {
-          "volatility": {
-            "portfolioBeta": 0.85,
-            "marketComparison": "Below market volatility"
-          },
-          "qualityScore": {
-            "overall": 75,
-            "stability": 80,
-            "growth": 70,
-            "value": 75
-          }
-        },
-        "insights": [
-          {
-            "type": "strength",
-            "title": "Good Diversification",
-            "description": "Your portfolio is well diversified across sectors",
-            "priority": "medium"
-          },
-          {
-            "type": "warning",
-            "title": "High Expense Ratio",
-            "description": "Some of your mutual funds have high expense ratios",
-            "priority": "high",
-            "actionable": true
-          }
-        ],
-        "taxInsights": {
-          "potentialSavings": 12000,
-          "suggestions": [
-            "Consider tax-saving ELSS funds",
-            "Review holding periods for better tax treatment"
-          ]
-        },
-        "keyRecommendations": [
-          "Increase equity exposure by 5%",
-          "Reduce high-cost mutual funds"
-        ],
-        "actionItems": [
-          "Rebalance portfolio quarterly",
-          "Set up SIP for consistent investing"
-        ]
+    // Format the portfolio data for Claude
+    const formattedPortfolio = {
+      userProfile: {
+        age: userInfo.age || "Unknown",
+        riskTolerance: userInfo.riskTolerance || "moderate",
+        financialGoals: userInfo.financialGoals || [],
+        city: userInfo.city || "Unknown"
+      },
+      assets: {
+        stocks: stocks.map(stock => ({
+          name: stock.name,
+          symbol: stock.symbol,
+          quantity: stock.quantity,
+          averagePrice: stock.averagePrice,
+          currentPrice: stock.currentPrice,
+          currentValue: stock.quantity * stock.currentPrice,
+          profitLoss: (stock.currentPrice - stock.averagePrice) * stock.quantity,
+          profitLossPercentage: ((stock.currentPrice - stock.averagePrice) / stock.averagePrice) * 100,
+          sector: stock.sector
+        })),
+        mutualFunds: mutualFunds.map(mf => ({
+          name: mf.name,
+          investedAmount: mf.investedAmount,
+          currentValue: mf.currentValue,
+          profitLoss: mf.currentValue - mf.investedAmount,
+          profitLossPercentage: ((mf.currentValue - mf.investedAmount) / mf.investedAmount) * 100,
+          category: mf.category
+        })),
+        externalInvestments: externalInvestments.map(inv => ({
+          name: inv.name,
+          type: inv.type,
+          amount: inv.amount
+        })),
+        zerodhaHoldings: zerodhaHoldings
+      },
+      liabilities: {
+        monthlyExpenses: monthlyExpenses,
+        regularExpenses: expenses.map(expense => ({
+          name: expense.name,
+          amount: expense.amount,
+          frequency: expense.frequency,
+          type: expense.type
+        })),
+        futureExpenses: futureExpenses.map(expense => ({
+          purpose: expense.purpose,
+          amount: expense.amount,
+          timeframe: expense.timeframe,
+          priority: expense.priority
+        }))
+      },
+      summary: {
+        totalStocksValue,
+        totalMFValue,
+        totalExternalValue,
+        totalPortfolioValue,
+        monthlyExpenses
       }
-
-      Please ensure that the response is structured exactly as specified and contains only valid JSON. Do not include any explanatory text outside the JSON structure.
-    `;
-
-    // Call Claude API for analysis
-    console.log("Sending request to Claude API");
-    let analysis;
-    let claudeResponse;
+    };
     
-    try {
-      claudeResponse = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": CLAUDE_API_KEY,
-          "anthropic-version": "2023-06-01"
-        },
-        body: JSON.stringify({
-          model: "claude-3-sonnet-20240229",
-          max_tokens: 4000,
-          messages: [
-            {
-              role: "user",
-              content: message
-            }
-          ],
-          temperature: 0.5,
-          system: "You are a financial advisor specializing in portfolio analysis. Provide insightful, accurate, and actionable financial advice. Only respond with valid JSON as specified in the user's message."
-        })
+    // Calculate portfolio allocations
+    const assetAllocation = [];
+    if (totalStocksValue > 0) {
+      assetAllocation.push({
+        type: "Equities",
+        value: totalStocksValue,
+        percentage: (totalStocksValue / totalPortfolioValue) * 100
       });
-    } catch (fetchError) {
-      console.error("Error fetching from Claude API:", fetchError);
-      return new Response(
-        JSON.stringify({ error: `Error connecting to Claude API: ${fetchError.message}` }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
     }
-
-    if (!claudeResponse.ok) {
-      const errorText = await claudeResponse.text();
-      console.error("Claude API error:", errorText);
-      return new Response(
-        JSON.stringify({ error: "Failed to analyze portfolio with Claude AI", details: errorText }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
-
-    const claudeData = await claudeResponse.json();
-    console.log("Received response from Claude API");
     
-    // Extract the analysis from Claude's response
+    if (totalMFValue > 0) {
+      assetAllocation.push({
+        type: "Mutual Funds",
+        value: totalMFValue,
+        percentage: (totalMFValue / totalPortfolioValue) * 100
+      });
+    }
+    
+    // Group external investments by type
+    const externalByType = externalInvestments.reduce((acc, inv) => {
+      if (!acc[inv.type]) acc[inv.type] = 0;
+      acc[inv.type] += inv.amount;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    Object.keys(externalByType).forEach(type => {
+      assetAllocation.push({
+        type,
+        value: externalByType[type],
+        percentage: (externalByType[type] / totalPortfolioValue) * 100
+      });
+    });
+    
+    // Prepare sector breakdown
+    const sectorData = stocks.reduce((acc, stock) => {
+      const sector = stock.sector || "Unknown";
+      if (!acc[sector]) acc[sector] = 0;
+      acc[sector] += stock.quantity * stock.currentPrice;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    const sectorBreakdown = Object.keys(sectorData).map(sector => ({
+      sector,
+      totalValue: sectorData[sector],
+      percentage: (sectorData[sector] / totalStocksValue) * 100
+    }));
+    
+    // Create the system message for Claude
+    const systemMessage = `You are an expert financial advisor analyzing an investor's portfolio. 
+    Use the provided portfolio data to generate a comprehensive analysis including:
+    
+    1. A summary of the portfolio's current state and overall health
+    2. Performance metrics (total value, profit/loss, etc.)
+    3. Asset allocation analysis and recommendations
+    4. Risk assessment and volatility metrics
+    5. Sector breakdown and diversification analysis
+    6. Tax-saving opportunities and suggestions
+    7. Key insights and recommendations for improvement
+    8. Actionable steps the investor should take
+    
+    Format your response as a valid JSON object with the following structure:
+    {
+      "summary": "Overall portfolio summary",
+      "assetAllocation": [
+        { "type": "Asset type", "percentage": number, "value": number }
+      ],
+      "performanceMetrics": {
+        "totalValue": number,
+        "profitLoss": number,
+        "profitLossPercentage": number,
+        "cagr": number,
+        "irr": number,
+        "sharpeRatio": number
+      },
+      "sectorBreakdown": [
+        { "sector": "Sector name", "totalValue": number, "percentage": number }
+      ],
+      "riskMetrics": {
+        "volatility": {
+          "portfolioBeta": number,
+          "marketComparison": "Comparison text"
+        },
+        "qualityScore": {
+          "overall": number,
+          "stability": number,
+          "growth": number,
+          "value": number
+        }
+      },
+      "insights": [
+        {
+          "type": "strength | warning | suggestion | tax | goal | volatility",
+          "title": "Insight title",
+          "description": "Insight description",
+          "priority": "low | medium | high",
+          "actionable": boolean
+        }
+      ],
+      "taxInsights": {
+        "potentialSavings": number,
+        "suggestions": ["Tax suggestion 1", "Tax suggestion 2"]
+      },
+      "keyRecommendations": ["Recommendation 1", "Recommendation 2"],
+      "actionItems": ["Action 1", "Action 2"]
+    }
+    
+    Ensure your response is VALID JSON. Use realistic values based on the provided data.
+    If certain data isn't available, make reasonable assumptions and note them in your analysis.
+    Your analysis should be tailored to the user's age, risk tolerance, and financial goals.`;
+    
+    // Format user message with portfolio data
+    const userMessage = `Please analyze this investment portfolio:
+    
+    User Profile:
+    - Age: ${userInfo.age || "Unknown"}
+    - Risk Tolerance: ${userInfo.riskTolerance || "moderate"}
+    - Location: ${userInfo.city || "Unknown"}
+    - Financial Goals: ${(userInfo.financialGoals || []).join(", ") || "Not specified"}
+    
+    Portfolio Summary:
+    - Total Value: ${formatCurrency(totalPortfolioValue)}
+    - Stocks Value: ${formatCurrency(totalStocksValue)} (${stocks.length} holdings)
+    - Mutual Funds Value: ${formatCurrency(totalMFValue)} (${mutualFunds.length} funds)
+    - External Investments: ${formatCurrency(totalExternalValue)} (${externalInvestments.length} investments)
+    - Monthly Expenses: ${formatCurrency(monthlyExpenses)}
+    
+    Asset Allocation:
+    ${assetAllocation.map(asset => `- ${asset.type}: ${formatCurrency(asset.value)} (${asset.percentage.toFixed(1)}%)`).join("\n")}
+    
+    ${stocks.length > 0 ? `
+    Top Stocks:
+    ${stocks.slice(0, 5).map(stock => 
+      `- ${stock.name} (${stock.symbol}): ${formatCurrency(stock.quantity * stock.currentPrice)}`
+    ).join("\n")}
+    ` : ""}
+    
+    ${mutualFunds.length > 0 ? `
+    Top Mutual Funds:
+    ${mutualFunds.slice(0, 5).map(mf => 
+      `- ${mf.name}: ${formatCurrency(mf.currentValue)}`
+    ).join("\n")}
+    ` : ""}
+    
+    ${externalInvestments.length > 0 ? `
+    External Investments:
+    ${externalInvestments.map(inv => 
+      `- ${inv.name} (${inv.type}): ${formatCurrency(inv.amount)}`
+    ).join("\n")}
+    ` : ""}
+    
+    ${futureExpenses.length > 0 ? `
+    Future Financial Goals:
+    ${futureExpenses.map(exp => 
+      `- ${exp.purpose} (${exp.timeframe}): ${formatCurrency(exp.amount)} (Priority: ${exp.priority})`
+    ).join("\n")}
+    ` : ""}
+    
+    Please provide a comprehensive analysis with actionable recommendations.`;
+    
+    console.log("Sending request to Claude API...");
+    
+    // Call Claude API
+    const claudeResponse = await fetch(CLAUDE_API_URL, {
+      method: "POST",
+      headers: {
+        "x-api-key": CLAUDE_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "claude-3-opus-20240229",
+        max_tokens: 4000,
+        system: systemMessage,
+        messages: [
+          { role: "user", content: userMessage }
+        ]
+      })
+    });
+    
+    // Check for errors in Claude API response
+    if (!claudeResponse.ok) {
+      const errorData = await claudeResponse.text();
+      console.error("Claude API error:", errorData);
+      return new Response(
+        JSON.stringify({ error: `Claude API error: ${claudeResponse.status} ${claudeResponse.statusText}` }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+    
+    // Parse Claude's response
+    const claudeData = await claudeResponse.json();
+    
+    if (!claudeData.content || !claudeData.content[0] || !claudeData.content[0].text) {
+      console.error("Unexpected Claude API response format:", claudeData);
+      return new Response(
+        JSON.stringify({ error: "Invalid response from analysis service" }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+    
+    // Extract the content from Claude's response
+    const analysisText = claudeData.content[0].text;
+    
+    console.log("Received response from Claude API, parsing JSON...");
+    
+    // Attempt to parse the response as JSON
+    let analysisData;
     try {
-      // Get the JSON string from Claude's response content
-      const responseContent = claudeData.content[0].text;
-      console.log("Raw Claude response:", responseContent.substring(0, 300) + "...");
+      // Look for JSON content in the response - it might be wrapped in markdown code blocks
+      const jsonMatch = analysisText.match(/```(?:json)?\s*({[\s\S]*?})\s*```/) || 
+                         analysisText.match(/({[\s\S]*})/) ||
+                         analysisText.match(/<jsonContent>([\s\S]*?)<\/jsonContent>/);
       
-      // Extract JSON from the response (in case Claude adds any extra text)
-      const jsonMatch = responseContent.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error("Could not extract JSON from Claude's response");
+      const jsonContent = jsonMatch ? jsonMatch[1] : analysisText;
+      analysisData = JSON.parse(jsonContent);
+      
+      // Validate required fields
+      const requiredFields = ['summary', 'assetAllocation', 'performanceMetrics', 'sectorBreakdown', 'insights'];
+      const missingFields = requiredFields.filter(field => !analysisData[field]);
+      
+      if (missingFields.length > 0) {
+        console.error("Missing required fields in parsed data:", missingFields);
+        throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
       }
       
-      const jsonString = jsonMatch[0];
-      console.log("Extracted JSON string:", jsonString.substring(0, 300) + "...");
+    } catch (error) {
+      console.error("Error parsing Claude response:", error);
+      console.log("Raw response:", analysisText);
       
-      try {
-        analysis = JSON.parse(jsonString);
-        console.log("Successfully parsed JSON from Claude's response");
-      } catch (jsonParseError) {
-        console.error("Failed to parse JSON:", jsonParseError);
-        throw new Error(`Failed to parse JSON from Claude's response: ${jsonParseError.message}`);
-      }
-      
-      // Validate analysis structure
-      const requiredFields = [
-        'summary', 
-        'performanceMetrics', 
-        'assetAllocation', 
-        'sectorBreakdown', 
-        'riskMetrics',
-        'insights',
-        'taxInsights',
-        'keyRecommendations',
-        'actionItems'
-      ];
-      
-      for (const field of requiredFields) {
-        if (!analysis[field]) {
-          console.error(`Missing required field in analysis: ${field}`);
-          analysis[field] = field === 'insights' ? [] : 
-                           field === 'keyRecommendations' ? [] : 
-                           field === 'actionItems' ? [] : 
-                           field === 'summary' ? "Analysis generated with some missing elements." : {};
-        }
-      }
-      
-      // Save the analysis to the database
-      try {
-        const { error: saveError } = await supabase
-          .from('portfolio_analysis')
-          .insert({
-            user_id: user.id,
-            analysis_data: analysis,
-            portfolio_data: JSON.stringify(portfolioData),
-            analysis_date: new Date().toISOString()
-          });
-          
-        if (saveError) {
-          console.error("Error saving analysis to database:", saveError);
-        } else {
-          console.log("Successfully saved analysis to database");
-        }
-      } catch (dbError) {
-        console.error("Database operation failed:", dbError);
-      }
-    } catch (parseError) {
-      console.error("Error processing Claude response:", parseError);
+      // Return a default analysis with error information
       return new Response(
         JSON.stringify({ 
-          error: "Failed to process portfolio analysis", 
-          details: parseError.message,
-          claudeResponse: claudeData.content[0].text.substring(0, 1000) + "..." 
+          error: "Failed to parse analysis results",
+          rawResponse: analysisText.substring(0, 1000) // Truncate for logging
         }),
         {
           status: 500,
@@ -394,18 +419,21 @@ serve(async (req) => {
         }
       );
     }
-
-    // Return the analysis
+    
+    console.log("Successfully parsed portfolio analysis");
+    
+    // Return the analysis data
     return new Response(
-      JSON.stringify(analysis),
+      JSON.stringify(analysisData),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
+    
   } catch (error) {
-    console.error("Error in portfolio analysis:", error);
+    console.error("Unexpected error:", error);
     return new Response(
-      JSON.stringify({ error: "Internal server error: " + error.message }),
+      JSON.stringify({ error: `Unexpected error: ${error instanceof Error ? error.message : String(error)}` }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }

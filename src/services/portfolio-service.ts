@@ -26,7 +26,7 @@ export interface MutualFund {
   units?: number;
 }
 
-// Updated to match the database enum types
+// Database enum types
 export type InvestmentType = 'Gold' | 'Fixed Deposit' | 'Real Estate' | 'Bank Deposit' | 'PPF' | 'EPF' | 'National Pension Scheme' | 'Bonds' | 'Others';
 
 export interface ExternalInvestment {
@@ -43,7 +43,7 @@ export type ExpenseType = 'EMI' | 'Rent' | 'School Fees' | 'Loan Payment' | 'Ins
 export interface Expense {
   id?: number;
   name: string;
-  type: string;
+  type: ExpenseType;
   amount: number;
   frequency: ExpenseFrequency;
   notes?: string;
@@ -104,8 +104,75 @@ export interface PortfolioData {
   zerodhaHoldings?: ZerodhaHolding[];
 }
 
-// Helper function for mapping enum values
-const mapCityToDbEnum = (city: string): CityType => {
+// Type mapping helpers for UI to Database conversions
+const mapExpenseFrequencyForDb = (frequency: ExpenseFrequency): string => {
+  const frequencyMap: Record<ExpenseFrequency, string> = {
+    'monthly': 'Monthly',
+    'quarterly': 'Quarterly',
+    'yearly': 'Yearly',
+    'one-time': 'One-time'
+  };
+  return frequencyMap[frequency] || 'Monthly';
+};
+
+const mapExpenseTypeForDb = (type: ExpenseType): string => {
+  return type; // The types should match the database enum
+};
+
+const mapFuturePurposeForDb = (purpose: FuturePurpose): string => {
+  const purposeMap: Record<FuturePurpose, string> = {
+    'home': 'House Purchase',
+    'education': 'Education',
+    'vehicle': 'Car Purchase',
+    'vacation': 'Vacation',
+    'wedding': 'Wedding',
+    'healthcare': 'Medical Treatment',
+    'others': 'Other'
+  };
+  return purposeMap[purpose] || 'Other';
+};
+
+const mapTimeFrameForDb = (timeframe: TimeFrame): string => {
+  const timeframeMap: Record<TimeFrame, string> = {
+    'short_term': '1-2 years',
+    'medium_term': '3-5 years',
+    'long_term': '5-10 years'
+  };
+  return timeframeMap[timeframe] || '3-5 years';
+};
+
+const mapPriorityLevelForDb = (priority: PriorityLevel): string => {
+  const priorityMap: Record<PriorityLevel, string> = {
+    'low': 'Low',
+    'medium': 'Medium',
+    'high': 'High'
+  };
+  return priorityMap[priority] || 'Medium';
+};
+
+const mapRiskToleranceForDb = (risk: RiskTolerance): string => {
+  const riskMap: Record<RiskTolerance, string> = {
+    'conservative': 'low - safety first',
+    'moderate': 'medium - balanced apporach',
+    'aggressive': 'high - growth focused'
+  };
+  return riskMap[risk] || 'medium - balanced apporach';
+};
+
+const mapCityToDbEnum = (city: CityType): string => {
+  // For UI to DB mapping
+  const cityDisplayMap: Record<string, string> = {
+    'metro': 'Mumbai',
+    'tier1': 'Chennai',
+    'tier2': 'Ahmedabad', 
+    'tier3': 'Lucknow',
+    'overseas': 'Other'
+  };
+  return cityDisplayMap[city] || 'Other';
+};
+
+// For DB to UI mapping
+const mapDbCityToUiEnum = (city: string): CityType => {
   const cityMap: Record<string, CityType> = {
     'Mumbai': 'metro',
     'Delhi': 'metro',
@@ -122,11 +189,11 @@ const mapCityToDbEnum = (city: string): CityType => {
   return cityMap[city] || 'overseas';
 };
 
-const mapRiskToleranceToDbEnum = (risk: string): RiskTolerance => {
+const mapDbRiskToUiEnum = (risk: string): RiskTolerance => {
   const riskMap: Record<string, RiskTolerance> = {
-    'low': 'conservative',
-    'medium': 'moderate',
-    'high': 'aggressive'
+    'low - safety first': 'conservative',
+    'medium - balanced apporach': 'moderate',
+    'high - growth focused': 'aggressive'
   };
   return riskMap[risk] || 'moderate';
 };
@@ -215,7 +282,7 @@ const PortfolioService = {
       
       // Insert new investments
       if (investments.length > 0) {
-        // Map to valid investment types if needed
+        // Insert investments one by one to avoid type issues
         for (const investment of investments) {
           await supabase
             .from('external_investments')
@@ -224,7 +291,7 @@ const PortfolioService = {
               investment_name: investment.name,
               investment_type: investment.type,
               amount: investment.amount,
-              notes: investment.notes
+              notes: investment.notes || ''
             });
         }
       }
@@ -283,7 +350,7 @@ const PortfolioService = {
         .delete()
         .eq('user_id', user.id);
       
-      // Insert new expenses
+      // Insert new expenses one by one
       if (expenses.length > 0) {
         for (const expense of expenses) {
           await supabase
@@ -292,9 +359,9 @@ const PortfolioService = {
               user_id: user.id,
               description: expense.name,
               amount: expense.amount,
-              frequency: expense.frequency,
-              expense_type: expense.type,
-              notes: expense.notes
+              frequency: mapExpenseFrequencyForDb(expense.frequency),
+              expense_type: mapExpenseTypeForDb(expense.type),
+              notes: expense.notes || ''
             });
         }
       }
@@ -328,9 +395,9 @@ const PortfolioService = {
       return data.map(exp => ({
         id: exp.id,
         name: exp.description,
-        type: exp.expense_type,
+        type: exp.expense_type as ExpenseType,
         amount: exp.amount,
-        frequency: exp.frequency as ExpenseFrequency,
+        frequency: exp.frequency.toLowerCase() as ExpenseFrequency,
         notes: exp.notes
       }));
     } catch (error) {
@@ -354,18 +421,18 @@ const PortfolioService = {
         .delete()
         .eq('user_id', user.id);
       
-      // Insert new future expenses
+      // Insert new future expenses one by one
       if (expenses.length > 0) {
         for (const expense of expenses) {
           await supabase
             .from('future_expenses')
             .insert({
               user_id: user.id,
-              purpose: expense.purpose,
+              purpose: mapFuturePurposeForDb(expense.purpose),
               amount: expense.amount,
-              timeframe: expense.timeframe,
-              priority: expense.priority,
-              notes: expense.notes
+              timeframe: mapTimeFrameForDb(expense.timeframe),
+              priority: mapPriorityLevelForDb(expense.priority),
+              notes: expense.notes || ''
             });
         }
       }
@@ -396,14 +463,35 @@ const PortfolioService = {
         return [];
       }
       
-      return data.map(exp => ({
-        id: exp.id,
-        purpose: exp.purpose as FuturePurpose,
-        amount: exp.amount,
-        timeframe: exp.timeframe as TimeFrame,
-        priority: exp.priority as PriorityLevel,
-        notes: exp.notes
-      }));
+      return data.map(exp => {
+        // Convert database values to our application types
+        let purpose: FuturePurpose = 'others';
+        if (exp.purpose === 'House Purchase') purpose = 'home';
+        else if (exp.purpose === 'Car Purchase') purpose = 'vehicle';
+        else if (exp.purpose === 'Education') purpose = 'education';
+        else if (exp.purpose === 'Wedding') purpose = 'wedding';
+        else if (exp.purpose === 'Medical Treatment') purpose = 'healthcare';
+        else if (exp.purpose === 'Vacation') purpose = 'vacation';
+        
+        let timeframe: TimeFrame = 'medium_term';
+        if (exp.timeframe === '1-2 years') timeframe = 'short_term';
+        else if (exp.timeframe === '3-5 years') timeframe = 'medium_term';
+        else if (exp.timeframe === '5-10 years') timeframe = 'long_term';
+        
+        let priority: PriorityLevel = 'medium';
+        if (exp.priority === 'Low') priority = 'low';
+        else if (exp.priority === 'Medium') priority = 'medium';
+        else if (exp.priority === 'High') priority = 'high';
+        
+        return {
+          id: exp.id,
+          purpose,
+          amount: exp.amount,
+          timeframe,
+          priority,
+          notes: exp.notes
+        };
+      });
     } catch (error) {
       console.error('Error fetching future expenses:', error);
       return [];
@@ -419,13 +507,6 @@ const PortfolioService = {
         throw new Error('User not logged in');
       }
       
-      // Map UI values to database enums
-      const city = typeof userInfo.city === 'string' ? 
-        mapCityToDbEnum(userInfo.city as string) : userInfo.city;
-        
-      const riskTolerance = typeof userInfo.riskTolerance === 'string' ?
-        mapRiskToleranceToDbEnum(userInfo.riskTolerance as string) : userInfo.riskTolerance;
-      
       // Check if user info exists
       const { data: existingData } = await supabase
         .from('personal_info')
@@ -433,14 +514,18 @@ const PortfolioService = {
         .eq('user_id', user.id)
         .maybeSingle();
       
+      // Prepare data for database
+      const dbCity = mapCityToDbEnum(userInfo.city);
+      const dbRiskTolerance = mapRiskToleranceForDb(userInfo.riskTolerance);
+      
       if (existingData) {
         // Update existing user info
         await supabase
           .from('personal_info')
           .update({
             age: userInfo.age,
-            city: city,
-            risk_tolerance: riskTolerance,
+            city: dbCity,
+            risk_tolerance: dbRiskTolerance,
             financial_goals: userInfo.financialGoals || []
           })
           .eq('user_id', user.id);
@@ -451,8 +536,8 @@ const PortfolioService = {
           .insert({
             user_id: user.id,
             age: userInfo.age,
-            city: city,
-            risk_tolerance: riskTolerance,
+            city: dbCity,
+            risk_tolerance: dbRiskTolerance,
             financial_goals: userInfo.financialGoals || []
           });
       }
@@ -491,8 +576,8 @@ const PortfolioService = {
       return {
         id: data.id,
         age: data.age,
-        city: data.city as CityType,
-        riskTolerance: data.risk_tolerance as RiskTolerance,
+        city: mapDbCityToUiEnum(data.city),
+        riskTolerance: mapDbRiskToUiEnum(data.risk_tolerance),
         financialGoals: data.financial_goals || []
       };
     } catch (error) {
@@ -509,15 +594,12 @@ const PortfolioService = {
         return;
       }
       
-      // Save the snapshot
-      await supabase
-        .from('portfolio_snapshots')
-        .insert({
-          user_id: user.id,
-          snapshot_data: JSON.stringify(portfolioData),
-          snapshot_date: new Date().toISOString()
-        });
-        
+      // Save the snapshot using RPC function
+      await supabase.rpc('save_portfolio_snapshot', {
+        p_user_id: user.id,
+        p_snapshot_data: portfolioData
+      });
+      
     } catch (error) {
       console.error('Error taking portfolio snapshot:', error);
     }
@@ -531,14 +613,10 @@ const PortfolioService = {
         return null;
       }
       
-      // Since the stored function is not available, let's fetch it directly
-      const { data, error } = await supabase
-        .from('portfolio_snapshots')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('snapshot_date', { ascending: false })
-        .limit(1)
-        .single();
+      // Use RPC function to get the latest snapshot
+      const { data, error } = await supabase.rpc('get_latest_portfolio_snapshot', {
+        p_user_id: user.id
+      });
       
       if (error || !data) {
         console.error("Error fetching latest portfolio snapshot:", error);
@@ -546,13 +624,7 @@ const PortfolioService = {
       }
       
       // Return the snapshot data
-      try {
-        const portfolioData = JSON.parse(data.snapshot_data);
-        return portfolioData as PortfolioData;
-      } catch (parseError) {
-        console.error("Error parsing portfolio data:", parseError);
-        return null;
-      }
+      return data as PortfolioData;
     } catch (error) {
       console.error("Error in getLatestPortfolioSnapshot:", error);
       return null;
@@ -562,6 +634,7 @@ const PortfolioService = {
   // Zerodha portfolio integration methods
   getZerodhaLoginUrl: async (): Promise<string | null> => {
     try {
+      console.log("Requesting Zerodha login URL from edge function...");
       const { data, error } = await supabase.functions.invoke('zerodha-login-url');
       
       if (error) {
@@ -569,7 +642,16 @@ const PortfolioService = {
         return null;
       }
       
-      return data?.url || null;
+      console.log("Response received:", data);
+      
+      // Check if the response contains a login URL
+      if (data && data.loginUrl) {
+        console.log("Login URL received:", data.loginUrl);
+        return data.loginUrl;
+      } else {
+        console.error("No login URL in response:", data);
+        return null;
+      }
     } catch (error) {
       console.error('Error in getZerodhaLoginUrl:', error);
       return null;

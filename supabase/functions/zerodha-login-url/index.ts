@@ -2,7 +2,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const KITE_API_KEY = Deno.env.get("KITE_API_KEY") || "";
-const REDIRECT_URI = Deno.env.get("REDIRECT_URI") || "";
+const REDIRECT_URI = Deno.env.get("REDIRECTION_URI") || "";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,10 +31,10 @@ serve(async (req) => {
     }
 
     if (!REDIRECT_URI) {
-      console.error("Missing environment variable: REDIRECT_URI");
+      console.error("Missing environment variable: REDIRECTION_URI");
       return new Response(
         JSON.stringify({
-          error: "Server configuration error. REDIRECT_URI is not set."
+          error: "Server configuration error. REDIRECTION_URI is not set."
         }),
         {
           status: 500,

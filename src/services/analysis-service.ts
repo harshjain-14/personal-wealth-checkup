@@ -198,15 +198,13 @@ const AnalysisService = {
         generatedDate: new Date().toISOString()
       };
       
-      // Save the analysis to the database using direct insert
+      // Save the analysis to the database using RPC call instead of direct insert
       try {
-        const { error: saveError } = await supabase
-          .from('portfolio_analysis')
-          .insert({
-            user_id: session.user.id,
-            analysis_data: analysisWithDate,
-            analysis_date: new Date().toISOString()
-          });
+        // Use an RPC function to save the analysis
+        const { error: saveError } = await supabase.rpc('save_portfolio_analysis', {
+          p_user_id: session.user.id,
+          p_analysis_data: analysisWithDate
+        });
           
         if (saveError) {
           console.error("Error saving analysis to database:", saveError);
@@ -234,14 +232,10 @@ const AnalysisService = {
         return null;
       }
       
-      // Fetch directly since the RPC function is not available
-      const { data, error } = await supabase
-        .from('portfolio_analysis')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .order('analysis_date', { ascending: false })
-        .limit(1)
-        .single();
+      // Use RPC function to get the latest analysis
+      const { data, error } = await supabase.rpc('get_latest_analysis', {
+        p_user_id: session.user.id
+      });
         
       if (error) {
         console.error('Error fetching latest analysis:', error);
@@ -253,7 +247,12 @@ const AnalysisService = {
         return null;
       }
       
-      return data.analysis_data as AnalysisReport;
+      // Parse the JSON data if it's returned as a string
+      if (typeof data === 'string') {
+        return JSON.parse(data) as AnalysisReport;
+      }
+      
+      return data as AnalysisReport;
     } catch (error) {
       console.error('Error in getLatestAnalysis:', error);
       return null;

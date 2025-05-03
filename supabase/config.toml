@@ -56,3 +56,15 @@ url = ""
 [functions]
 [functions.portfolio-analysis]
 verify_jwt = true
+
+[functions.zerodha-login-url]
+verify_jwt = false
+
+[functions.zerodha-exchange-token]
+verify_jwt = false
+
+[functions.zerodha-logout]
+verify_jwt = true
+
+[functions.zerodha-portfolio]
+verify_jwt = true
