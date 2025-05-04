@@ -17,7 +17,7 @@ import { Trash2 } from 'lucide-react';
 
 interface FutureExpensesFormProps {
   futureExpenses: FutureExpense[];
-  onSave: (futureExpenses: FutureExpense[]) => void;
+  onSave: (futureExpenses: FutureExpense[]) => Promise<void>;
 }
 
 // UI display values - these are what users see and select
@@ -134,6 +134,7 @@ const FutureExpensesForm = ({ futureExpenses, onSave }: FutureExpensesFormProps)
     notes: ''
   });
   const [customTimeframe, setCustomTimeframe] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   // Update the list when props change to ensure data consistency
   useEffect(() => {
@@ -148,7 +149,7 @@ const FutureExpensesForm = ({ futureExpenses, onSave }: FutureExpensesFormProps)
 
     const dbExpense = mapUiToDbExpense(newExpense, customTimeframe);
     
-    console.log("Adding expense with purpose:", newExpense.purpose); // Debug logging
+    console.log("Adding future expense:", dbExpense);
     
     setFutureExpensesList([...futureExpensesList, dbExpense]);
     
@@ -171,9 +172,17 @@ const FutureExpensesForm = ({ futureExpenses, onSave }: FutureExpensesFormProps)
     toast.success('Future expense removed');
   };
 
-  const handleSave = () => {
-    console.log("Saving future expenses:", futureExpensesList); // Debug logging
-    onSave(futureExpensesList);
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+      console.log("Saving future expenses:", futureExpensesList);
+      await onSave(futureExpensesList);
+      setIsSaving(false);
+      // Success toast is handled in the portfolio service
+    } catch (error) {
+      console.error('Error saving future expenses:', error);
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -340,8 +349,9 @@ const FutureExpensesForm = ({ futureExpenses, onSave }: FutureExpensesFormProps)
         <Button 
           onClick={handleSave}
           className="w-full bg-finance-blue hover:bg-finance-blue/90"
+          disabled={isSaving}
         >
-          Save All Future Expenses
+          {isSaving ? 'Saving...' : 'Save All Future Expenses'}
         </Button>
       </CardFooter>
     </Card>

@@ -17,7 +17,7 @@ import { Trash2 } from 'lucide-react';
 
 interface ExpensesFormProps {
   expenses: Expense[];
-  onSave: (expenses: Expense[]) => void;
+  onSave: (expenses: Expense[]) => Promise<void>;
 }
 
 const EXPENSE_TYPES: ExpenseType[] = [
@@ -47,6 +47,7 @@ const ExpensesForm = ({ expenses, onSave }: ExpensesFormProps) => {
     frequency: 'monthly',
     notes: ''
   });
+  const [isSaving, setIsSaving] = useState(false);
 
   // Update expenses list when props change
   useEffect(() => {
@@ -78,8 +79,16 @@ const ExpensesForm = ({ expenses, onSave }: ExpensesFormProps) => {
     toast.success('Expense removed');
   };
 
-  const handleSave = () => {
-    onSave(expensesList);
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+      await onSave(expensesList);
+      setIsSaving(false);
+      // Success toast is handled in the portfolio service
+    } catch (error) {
+      console.error('Error saving expenses:', error);
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -219,8 +228,9 @@ const ExpensesForm = ({ expenses, onSave }: ExpensesFormProps) => {
         <Button 
           onClick={handleSave}
           className="w-full bg-finance-blue hover:bg-finance-blue/90"
+          disabled={isSaving}
         >
-          Save All Expenses
+          {isSaving ? 'Saving...' : 'Save All Expenses'}
         </Button>
       </CardFooter>
     </Card>

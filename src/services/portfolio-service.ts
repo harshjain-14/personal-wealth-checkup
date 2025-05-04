@@ -4,6 +4,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
+import { Json } from '@/integrations/supabase/types';
 
 // Define types for portfolio data aligned with database schema
 export interface Stock {
@@ -120,8 +121,8 @@ const mapExpenseTypeForDb = (type: ExpenseType): Database["public"]["Enums"]["ex
   return type as unknown as Database["public"]["Enums"]["expense_type_enum"];
 };
 
-const mapFuturePurposeForDb = (purpose: FuturePurpose): Database["public"]["Enums"]["future_purpose_enum"] => {
-  const purposeMap: Record<FuturePurpose, Database["public"]["Enums"]["future_purpose_enum"]> = {
+const mapFuturePurposeForDb = (purpose: FuturePurpose): Database["public"]["Enums"]["future_expense_enumm"] => {
+  const purposeMap: Record<FuturePurpose, Database["public"]["Enums"]["future_expense_enumm"]> = {
     'home': 'House Purchase',
     'education': 'Education',
     'vehicle': 'Car Purchase',
@@ -133,17 +134,18 @@ const mapFuturePurposeForDb = (purpose: FuturePurpose): Database["public"]["Enum
   return purposeMap[purpose];
 };
 
-const mapTimeFrameForDb = (timeframe: TimeFrame): Database["public"]["Enums"]["future_timeframe_enum"] => {
-  const timeframeMap: Record<TimeFrame, Database["public"]["Enums"]["future_timeframe_enum"]> = {
-    'short_term': '1-2 years',
-    'medium_term': '3-5 years',
-    'long_term': '5-10 years'
-  };
-  return timeframeMap[timeframe];
+const mapTimeFrameForDb = (timeframe: TimeFrame): Database["public"]["Enums"]["timeframe_enum"] => {
+  // Map UI timeframe values to database enum values
+  if (timeframe === 'short_term') return '1 year';
+  if (timeframe === 'medium_term') return '5 years';
+  if (timeframe === 'long_term') return '10 years';
+  
+  // Default case (should not happen with proper type checking)
+  return '5 years';
 };
 
-const mapPriorityLevelForDb = (priority: PriorityLevel): Database["public"]["Enums"]["priority_level_enum"] => {
-  const priorityMap: Record<PriorityLevel, Database["public"]["Enums"]["priority_level_enum"]> = {
+const mapPriorityLevelForDb = (priority: PriorityLevel): Database["public"]["Enums"]["priority_enum"] => {
+  const priorityMap: Record<PriorityLevel, Database["public"]["Enums"]["priority_enum"]> = {
     'low': 'Low',
     'medium': 'Medium',
     'high': 'High'
@@ -209,7 +211,7 @@ const PortfolioService = {
         throw new Error('User not logged in');
       }
       
-      // Take a snapshot of the portfolio
+      // Take a snapshot of the portfolio - convert to Json type
       await PortfolioService.takePortfolioSnapshot(portfolioData);
       
       const updatedPortfolioData = {
@@ -283,17 +285,25 @@ const PortfolioService = {
         throw new Error('User not logged in');
       }
       
+      console.log('Saving external investments:', investments);
+      
       // Clear existing investments
-      await supabase
+      const { error: deleteError } = await supabase
         .from('external_investments')
         .delete()
         .eq('user_id', user.id);
+      
+      if (deleteError) {
+        console.error('Error deleting existing investments:', deleteError);
+        toast.error('Failed to update investments');
+        throw deleteError;
+      }
       
       // Insert new investments
       if (investments.length > 0) {
         // Insert investments one by one to avoid type issues
         for (const investment of investments) {
-          await supabase
+          const { error: insertError } = await supabase
             .from('external_investments')
             .insert({
               user_id: user.id,
@@ -302,10 +312,16 @@ const PortfolioService = {
               amount: investment.amount,
               notes: investment.notes || ''
             });
+            
+          if (insertError) {
+            console.error('Error inserting investment:', insertError);
+            toast.error('Failed to save some investments');
+          }
         }
       }
       
       console.log("Investments saved successfully");
+      toast.success("Investments saved successfully");
       return investments;
     } catch (error) {
       console.error('Error saving external investments:', error);
@@ -332,6 +348,8 @@ const PortfolioService = {
         return [];
       }
       
+      console.log('Fetched external investments:', data);
+      
       return data.map(inv => ({
         id: inv.id,
         name: inv.investment_name,
@@ -354,16 +372,24 @@ const PortfolioService = {
         throw new Error('User not logged in');
       }
       
+      console.log('Saving expenses:', expenses);
+      
       // Clear existing expenses
-      await supabase
+      const { error: deleteError } = await supabase
         .from('regular_expenses')
         .delete()
         .eq('user_id', user.id);
+        
+      if (deleteError) {
+        console.error('Error deleting existing expenses:', deleteError);
+        toast.error('Failed to update expenses');
+        throw deleteError;
+      }
       
       // Insert new expenses one by one
       if (expenses.length > 0) {
         for (const expense of expenses) {
-          await supabase
+          const { error: insertError } = await supabase
             .from('regular_expenses')
             .insert({
               user_id: user.id,
@@ -373,9 +399,16 @@ const PortfolioService = {
               expense_type: mapExpenseTypeForDb(expense.type),
               notes: expense.notes || ''
             });
+            
+          if (insertError) {
+            console.error('Error inserting expense:', insertError);
+            toast.error('Failed to save some expenses');
+          }
         }
       }
       
+      console.log("Expenses saved successfully");
+      toast.success("Expenses saved successfully");
       return expenses;
     } catch (error) {
       console.error('Error saving regular expenses:', error);
@@ -402,6 +435,8 @@ const PortfolioService = {
         return [];
       }
       
+      console.log('Fetched expenses:', data);
+      
       return data.map(exp => ({
         id: exp.id,
         name: exp.description,
@@ -425,16 +460,24 @@ const PortfolioService = {
         throw new Error('User not logged in');
       }
       
+      console.log('Saving future expenses:', expenses);
+      
       // Clear existing future expenses
-      await supabase
+      const { error: deleteError } = await supabase
         .from('future_expenses')
         .delete()
         .eq('user_id', user.id);
+        
+      if (deleteError) {
+        console.error('Error deleting existing future expenses:', deleteError);
+        toast.error('Failed to update future expenses');
+        throw deleteError;
+      }
       
       // Insert new future expenses one by one
       if (expenses.length > 0) {
         for (const expense of expenses) {
-          await supabase
+          const { error: insertError } = await supabase
             .from('future_expenses')
             .insert({
               user_id: user.id,
@@ -444,9 +487,16 @@ const PortfolioService = {
               priority: mapPriorityLevelForDb(expense.priority),
               notes: expense.notes || ''
             });
+            
+          if (insertError) {
+            console.error('Error inserting future expense:', insertError);
+            toast.error('Failed to save some future expenses');
+          }
         }
       }
       
+      console.log("Future expenses saved successfully");
+      toast.success("Future expenses saved successfully");
       return expenses;
     } catch (error) {
       console.error('Error saving future expenses:', error);
@@ -473,6 +523,8 @@ const PortfolioService = {
         return [];
       }
       
+      console.log('Fetched future expenses:', data);
+      
       return data.map(exp => {
         // Map database values to our application types
         let purpose: FuturePurpose = 'others';
@@ -484,9 +536,12 @@ const PortfolioService = {
         else if (exp.purpose === 'Vacation') purpose = 'vacation';
         
         let timeframe: TimeFrame = 'medium_term';
-        if (exp.timeframe === '1-2 years') timeframe = 'short_term';
-        else if (exp.timeframe === '3-5 years') timeframe = 'medium_term';
-        else if (exp.timeframe === '5-10 years') timeframe = 'long_term';
+        if (exp.timeframe === '1 year' || exp.timeframe === '6 months' || exp.timeframe === '3 months') 
+          timeframe = 'short_term';
+        else if (exp.timeframe === '2 years' || exp.timeframe === '5 years') 
+          timeframe = 'medium_term';
+        else if (exp.timeframe === '10 years') 
+          timeframe = 'long_term';
         
         let priority: PriorityLevel = 'medium';
         if (exp.priority === 'Low') priority = 'low';
@@ -517,12 +572,18 @@ const PortfolioService = {
         throw new Error('User not logged in');
       }
       
+      console.log('Saving user info:', userInfo);
+      
       // Check if user info exists
-      const { data: existingData } = await supabase
+      const { data: existingData, error: fetchError } = await supabase
         .from('personal_info')
         .select('*')
         .eq('user_id', user.id)
         .maybeSingle();
+      
+      if (fetchError) {
+        console.error('Error fetching existing user info:', fetchError);
+      }
       
       // Prepare data for database
       const dbCity = mapCityToDbEnum(userInfo.city);
@@ -530,7 +591,7 @@ const PortfolioService = {
       
       if (existingData) {
         // Update existing user info
-        await supabase
+        const { error: updateError } = await supabase
           .from('personal_info')
           .update({
             age: userInfo.age,
@@ -539,10 +600,16 @@ const PortfolioService = {
             financial_goals: userInfo.financialGoals || []
           })
           .eq('user_id', user.id);
+          
+        if (updateError) {
+          console.error('Error updating user info:', updateError);
+          toast.error('Failed to update personal information');
+          throw updateError;
+        }
       } else {
-        // Insert new user info - Note: we need to provide an ID for the personal_info table
+        // Insert new user info with a generated UUID
         const id = crypto.randomUUID();
-        await supabase
+        const { error: insertError } = await supabase
           .from('personal_info')
           .insert({
             id, // Generate a UUID for the id field
@@ -552,8 +619,16 @@ const PortfolioService = {
             risk_tolerance: dbRiskTolerance,
             financial_goals: userInfo.financialGoals || []
           });
+          
+        if (insertError) {
+          console.error('Error inserting user info:', insertError);
+          toast.error('Failed to save personal information');
+          throw insertError;
+        }
       }
       
+      console.log("User info saved successfully");
+      toast.success("Personal information saved successfully");
       return userInfo;
     } catch (error) {
       console.error('Error saving user info:', error);
@@ -585,6 +660,8 @@ const PortfolioService = {
         return null;
       }
       
+      console.log('Fetched user info:', data);
+      
       return {
         id: data.id,
         age: data.age,
@@ -606,17 +683,22 @@ const PortfolioService = {
         return;
       }
       
-      // Use direct insert instead of RPC function
+      // Convert portfolioData to JSON type before insertion
+      const portfolioDataJson = JSON.parse(JSON.stringify(portfolioData)) as Json;
+      
+      // Use direct insert with proper typing
       const { error } = await supabase
         .from('portfolio_snapshots')
         .insert({
           user_id: user.id,
-          snapshot_data: portfolioData
+          snapshot_data: portfolioDataJson
         });
       
       if (error) {
         console.error("Error taking portfolio snapshot:", error);
         throw error;
+      } else {
+        console.log("Portfolio snapshot saved successfully");
       }
       
     } catch (error) {
@@ -646,8 +728,8 @@ const PortfolioService = {
         return null;
       }
       
-      // Return the snapshot data
-      return data.snapshot_data as PortfolioData;
+      // Return the snapshot data as PortfolioData
+      return data.snapshot_data as unknown as PortfolioData;
     } catch (error) {
       console.error("Error in getLatestPortfolioSnapshot:", error);
       return null;

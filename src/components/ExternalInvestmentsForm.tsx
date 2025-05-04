@@ -17,7 +17,7 @@ import { Trash2 } from 'lucide-react';
 
 interface ExternalInvestmentsFormProps {
   investments: ExternalInvestment[];
-  onSave: (investments: ExternalInvestment[]) => void;
+  onSave: (investments: ExternalInvestment[]) => Promise<void>;
 }
 
 const INVESTMENT_TYPES: InvestmentType[] = [
@@ -40,6 +40,7 @@ const ExternalInvestmentsForm = ({ investments, onSave }: ExternalInvestmentsFor
     amount: 0,
     notes: ''
   });
+  const [isSaving, setIsSaving] = useState(false);
 
   // Update the investments list when props change
   useEffect(() => {
@@ -79,10 +80,14 @@ const ExternalInvestmentsForm = ({ investments, onSave }: ExternalInvestmentsFor
 
   const handleSave = async () => {
     try {
+      setIsSaving(true);
+      console.log("Saving investments:", investmentsList);
       await onSave(investmentsList);
-      toast.success('Investments saved successfully');
+      setIsSaving(false);
+      // Success toast is handled in the portfolio service
     } catch (error) {
       console.error('Error saving investments:', error);
+      setIsSaving(false);
       toast.error('Failed to save investments');
     }
   };
@@ -203,8 +208,9 @@ const ExternalInvestmentsForm = ({ investments, onSave }: ExternalInvestmentsFor
         <Button 
           onClick={handleSave}
           className="w-full bg-finance-blue hover:bg-finance-blue/90"
+          disabled={isSaving}
         >
-          Save All Investments
+          {isSaving ? 'Saving...' : 'Save All Investments'}
         </Button>
       </CardFooter>
     </Card>

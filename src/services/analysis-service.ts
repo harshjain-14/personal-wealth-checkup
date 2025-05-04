@@ -156,8 +156,8 @@ const AnalysisService = {
         return;
       }
 
-      // Use RPC function with properly typed parameters
-      const { error } = await supabase.rpc<SaveAnalysisResponse>('save_portfolio_analysis', {
+      // Use properly typed parameters for the RPC function
+      const { error } = await supabase.rpc('save_portfolio_analysis', {
         analysis_data: analysis,
         user_id_input: user.id,
         generated_at_input: analysis.generatedAt
@@ -182,8 +182,8 @@ const AnalysisService = {
         return null;
       }
 
-      // Use RPC function with properly typed response
-      const { data, error } = await supabase.rpc<GetLatestAnalysisResponse>('get_latest_portfolio_analysis', {
+      // Use the correct typing for the RPC function call
+      const { data, error } = await supabase.rpc('get_latest_portfolio_analysis', {
         user_id_input: user.id
       });
 
@@ -192,10 +192,11 @@ const AnalysisService = {
         return null;
       }
 
-      if (!data || !data.analysis_data) {
+      if (!data) {
         return null;
       }
 
+      // Handle the response structure correctly
       return data.analysis_data as AnalysisReport;
     } catch (error) {
       console.error("Error in getLatestAnalysis:", error);
@@ -211,8 +212,8 @@ const AnalysisService = {
         return [];
       }
 
-      // Use RPC function with properly typed response array
-      const { data, error } = await supabase.rpc<GetAllAnalysesResponse[]>('get_all_portfolio_analyses', {
+      // Use the correct typing for the RPC function call
+      const { data, error } = await supabase.rpc('get_all_portfolio_analyses', {
         user_id_input: user.id
       });
 
@@ -221,11 +222,12 @@ const AnalysisService = {
         return [];
       }
 
-      if (!data || !data.length) {
+      if (!data || !Array.isArray(data) || data.length === 0) {
         return [];
       }
 
-      return data.map((item) => item.analysis_data as AnalysisReport);
+      // Return the analyses with proper typing
+      return data.map(item => item.analysis_data as AnalysisReport);
     } catch (error) {
       console.error("Error in getAllAnalyses:", error);
       return [];
