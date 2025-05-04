@@ -105,8 +105,8 @@ export interface PortfolioData {
 }
 
 // Type mapping helpers for UI to Database conversions
-const mapExpenseFrequencyForDb = (frequency: ExpenseFrequency): Database["public"]["Enums"]["expense_frequency"] => {
-  const frequencyMap: Record<ExpenseFrequency, Database["public"]["Enums"]["expense_frequency"]> = {
+const mapExpenseFrequencyForDb = (frequency: ExpenseFrequency): Database["public"]["Enums"]["expense_frequency_enum"] => {
+  const frequencyMap: Record<ExpenseFrequency, Database["public"]["Enums"]["expense_frequency_enum"]> = {
     'monthly': 'Monthly',
     'quarterly': 'Quarterly',
     'yearly': 'Yearly',
@@ -115,13 +115,13 @@ const mapExpenseFrequencyForDb = (frequency: ExpenseFrequency): Database["public
   return frequencyMap[frequency];
 };
 
-const mapExpenseTypeForDb = (type: ExpenseType): Database["public"]["Enums"]["expense_type"] => {
+const mapExpenseTypeForDb = (type: ExpenseType): Database["public"]["Enums"]["expense_type_enum"] => {
   // The types should directly match the database enum, with exact casing
-  return type as unknown as Database["public"]["Enums"]["expense_type"];
+  return type as unknown as Database["public"]["Enums"]["expense_type_enum"];
 };
 
-const mapFuturePurposeForDb = (purpose: FuturePurpose): Database["public"]["Enums"]["future_purpose"] => {
-  const purposeMap: Record<FuturePurpose, Database["public"]["Enums"]["future_purpose"]> = {
+const mapFuturePurposeForDb = (purpose: FuturePurpose): Database["public"]["Enums"]["future_purpose_enum"] => {
+  const purposeMap: Record<FuturePurpose, Database["public"]["Enums"]["future_purpose_enum"]> = {
     'home': 'House Purchase',
     'education': 'Education',
     'vehicle': 'Car Purchase',
@@ -133,8 +133,8 @@ const mapFuturePurposeForDb = (purpose: FuturePurpose): Database["public"]["Enum
   return purposeMap[purpose];
 };
 
-const mapTimeFrameForDb = (timeframe: TimeFrame): Database["public"]["Enums"]["future_timeframe"] => {
-  const timeframeMap: Record<TimeFrame, Database["public"]["Enums"]["future_timeframe"]> = {
+const mapTimeFrameForDb = (timeframe: TimeFrame): Database["public"]["Enums"]["future_timeframe_enum"] => {
+  const timeframeMap: Record<TimeFrame, Database["public"]["Enums"]["future_timeframe_enum"]> = {
     'short_term': '1-2 years',
     'medium_term': '3-5 years',
     'long_term': '5-10 years'
@@ -142,8 +142,8 @@ const mapTimeFrameForDb = (timeframe: TimeFrame): Database["public"]["Enums"]["f
   return timeframeMap[timeframe];
 };
 
-const mapPriorityLevelForDb = (priority: PriorityLevel): Database["public"]["Enums"]["priority_level"] => {
-  const priorityMap: Record<PriorityLevel, Database["public"]["Enums"]["priority_level"]> = {
+const mapPriorityLevelForDb = (priority: PriorityLevel): Database["public"]["Enums"]["priority_level_enum"] => {
+  const priorityMap: Record<PriorityLevel, Database["public"]["Enums"]["priority_level_enum"]> = {
     'low': 'Low',
     'medium': 'Medium',
     'high': 'High'
@@ -151,8 +151,8 @@ const mapPriorityLevelForDb = (priority: PriorityLevel): Database["public"]["Enu
   return priorityMap[priority];
 };
 
-const mapRiskToleranceForDb = (risk: RiskTolerance): Database["public"]["Enums"]["risk_tolerance"] => {
-  const riskMap: Record<RiskTolerance, Database["public"]["Enums"]["risk_tolerance"]> = {
+const mapRiskToleranceForDb = (risk: RiskTolerance): Database["public"]["Enums"]["risk_tolerance_enum"] => {
+  const riskMap: Record<RiskTolerance, Database["public"]["Enums"]["risk_tolerance_enum"]> = {
     'conservative': 'low - safety first',
     'moderate': 'medium - balanced apporach',
     'aggressive': 'high - growth focused'
@@ -160,9 +160,9 @@ const mapRiskToleranceForDb = (risk: RiskTolerance): Database["public"]["Enums"]
   return riskMap[risk];
 };
 
-const mapCityToDbEnum = (city: CityType): Database["public"]["Enums"]["city_type"] => {
+const mapCityToDbEnum = (city: CityType): Database["public"]["Enums"]["city_enum"] => {
   // For UI to DB mapping
-  const cityDisplayMap: Record<CityType, Database["public"]["Enums"]["city_type"]> = {
+  const cityDisplayMap: Record<CityType, Database["public"]["Enums"]["city_enum"]> = {
     'metro': 'Mumbai',
     'tier1': 'Chennai',
     'tier2': 'Ahmedabad', 
@@ -173,8 +173,8 @@ const mapCityToDbEnum = (city: CityType): Database["public"]["Enums"]["city_type
 };
 
 // For DB to UI mapping
-const mapDbCityToUiEnum = (city: Database["public"]["Enums"]["city_type"]): CityType => {
-  const cityMap: Record<Database["public"]["Enums"]["city_type"], CityType> = {
+const mapDbCityToUiEnum = (city: Database["public"]["Enums"]["city_enum"]): CityType => {
+  const cityMap: Record<Database["public"]["Enums"]["city_enum"], CityType> = {
     'Mumbai': 'metro',
     'Delhi': 'metro',
     'Bangalore': 'metro',
@@ -190,8 +190,8 @@ const mapDbCityToUiEnum = (city: Database["public"]["Enums"]["city_type"]): City
   return cityMap[city];
 };
 
-const mapDbRiskToUiEnum = (risk: Database["public"]["Enums"]["risk_tolerance"]): RiskTolerance => {
-  const riskMap: Record<Database["public"]["Enums"]["risk_tolerance"], RiskTolerance> = {
+const mapDbRiskToUiEnum = (risk: Database["public"]["Enums"]["risk_tolerance_enum"]): RiskTolerance => {
+  const riskMap: Record<Database["public"]["Enums"]["risk_tolerance_enum"], RiskTolerance> = {
     'low - safety first': 'conservative',
     'medium - balanced apporach': 'moderate',
     'high - growth focused': 'aggressive'
@@ -474,7 +474,7 @@ const PortfolioService = {
       }
       
       return data.map(exp => {
-        // Convert database values to our application types
+        // Map database values to our application types
         let purpose: FuturePurpose = 'others';
         if (exp.purpose === 'House Purchase') purpose = 'home';
         else if (exp.purpose === 'Car Purchase') purpose = 'vehicle';
@@ -540,10 +540,12 @@ const PortfolioService = {
           })
           .eq('user_id', user.id);
       } else {
-        // Insert new user info
+        // Insert new user info - Note: we need to provide an ID for the personal_info table
+        const id = crypto.randomUUID();
         await supabase
           .from('personal_info')
           .insert({
+            id, // Generate a UUID for the id field
             user_id: user.id,
             age: userInfo.age,
             city: dbCity,

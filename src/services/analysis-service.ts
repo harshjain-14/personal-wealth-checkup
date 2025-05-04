@@ -85,6 +85,24 @@ export interface AssetAllocationItem {
   percentage: number;
 }
 
+// Define types for RPC function responses
+interface SaveAnalysisResponse {
+  success?: boolean;
+  error?: string;
+}
+
+interface GetLatestAnalysisResponse {
+  id?: number;
+  analysis_data?: AnalysisReport;
+  generated_at?: string;
+}
+
+interface GetAllAnalysesResponse {
+  id?: number;
+  analysis_data?: AnalysisReport;
+  generated_at?: string;
+}
+
 // Create a service for portfolio analysis
 const AnalysisService = {
   generateAnalysis: async (portfolioData: PortfolioData): Promise<AnalysisReport> => {
@@ -138,8 +156,8 @@ const AnalysisService = {
         return;
       }
 
-      // Use RPC function instead of direct table operations
-      const { error } = await supabase.rpc('save_portfolio_analysis', {
+      // Use RPC function with properly typed parameters
+      const { error } = await supabase.rpc<SaveAnalysisResponse>('save_portfolio_analysis', {
         analysis_data: analysis,
         user_id_input: user.id,
         generated_at_input: analysis.generatedAt
@@ -164,8 +182,8 @@ const AnalysisService = {
         return null;
       }
 
-      // Use RPC function instead of direct table operations
-      const { data, error } = await supabase.rpc('get_latest_portfolio_analysis', {
+      // Use RPC function with properly typed response
+      const { data, error } = await supabase.rpc<GetLatestAnalysisResponse>('get_latest_portfolio_analysis', {
         user_id_input: user.id
       });
 
@@ -174,7 +192,7 @@ const AnalysisService = {
         return null;
       }
 
-      if (!data) {
+      if (!data || !data.analysis_data) {
         return null;
       }
 
@@ -193,8 +211,8 @@ const AnalysisService = {
         return [];
       }
 
-      // Use RPC function instead of direct table operations
-      const { data, error } = await supabase.rpc('get_all_portfolio_analyses', {
+      // Use RPC function with properly typed response array
+      const { data, error } = await supabase.rpc<GetAllAnalysesResponse[]>('get_all_portfolio_analyses', {
         user_id_input: user.id
       });
 
@@ -207,7 +225,7 @@ const AnalysisService = {
         return [];
       }
 
-      return data.map((item: any) => item.analysis_data as AnalysisReport);
+      return data.map((item) => item.analysis_data as AnalysisReport);
     } catch (error) {
       console.error("Error in getAllAnalyses:", error);
       return [];
