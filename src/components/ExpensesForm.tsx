@@ -51,8 +51,10 @@ const ExpensesForm = ({ expenses, onSave }: ExpensesFormProps) => {
 
   // Update expenses list when props change
   useEffect(() => {
-    console.log("ExpensesForm received updated expenses:", expenses);
-    setExpensesList(expenses || []);
+    if (expenses && expenses.length > 0) {
+      console.log("ExpensesForm received updated expenses:", expenses);
+      setExpensesList(expenses);
+    }
   }, [expenses]);
 
   const handleAddExpense = () => {
@@ -68,7 +70,10 @@ const ExpensesForm = ({ expenses, onSave }: ExpensesFormProps) => {
       id: newExpense.id || Date.now()
     };
 
-    setExpensesList([...expensesList, expenseWithId]);
+    // Update local state with the new expense
+    const updatedList = [...expensesList, expenseWithId];
+    setExpensesList(updatedList);
+    
     setNewExpense({
       type: 'EMI',
       name: '',
@@ -91,13 +96,15 @@ const ExpensesForm = ({ expenses, onSave }: ExpensesFormProps) => {
     try {
       setIsSaving(true);
       console.log("Saving expenses:", expensesList);
-      await onSave(expensesList);
+      // Make a deep copy to avoid reference issues
+      const expensesToSave = JSON.parse(JSON.stringify(expensesList));
+      await onSave(expensesToSave);
       setIsSaving(false);
-      // Don't reset the list here - let the parent component update through props
+      toast.success('Expenses saved successfully to database');
     } catch (error) {
       console.error('Error saving expenses:', error);
       setIsSaving(false);
-      toast.error('Failed to save expenses');
+      toast.error('Failed to save expenses to database');
     }
   };
 

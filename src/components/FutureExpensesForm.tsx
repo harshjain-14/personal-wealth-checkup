@@ -1,5 +1,5 @@
 
-// The FutureExpensesForm component is very long, so I'll focus on the most critical parts to fix
+// The FutureExpensesForm component with improved data persistence
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
@@ -140,8 +140,10 @@ const FutureExpensesForm = ({ futureExpenses, onSave }: FutureExpensesFormProps)
 
   // Update the list when props change to ensure data consistency
   useEffect(() => {
-    console.log("FutureExpensesForm received updated expenses:", futureExpenses);
-    setFutureExpensesList(futureExpenses || []);
+    if (futureExpenses && futureExpenses.length > 0) {
+      console.log("FutureExpensesForm received updated expenses:", futureExpenses);
+      setFutureExpensesList(futureExpenses);
+    }
   }, [futureExpenses]);
 
   const handleAddExpense = () => {
@@ -160,7 +162,9 @@ const FutureExpensesForm = ({ futureExpenses, onSave }: FutureExpensesFormProps)
     
     console.log("Adding future expense:", expenseWithId);
     
-    setFutureExpensesList([...futureExpensesList, expenseWithId]);
+    // Update local state with the new expense
+    const updatedList = [...futureExpensesList, expenseWithId];
+    setFutureExpensesList(updatedList);
     
     setNewExpense({
       purpose: 'House Purchase',
@@ -185,13 +189,15 @@ const FutureExpensesForm = ({ futureExpenses, onSave }: FutureExpensesFormProps)
     try {
       setIsSaving(true);
       console.log("Saving future expenses:", futureExpensesList);
-      await onSave(futureExpensesList);
+      // Make a deep copy to avoid reference issues
+      const expensesToSave = JSON.parse(JSON.stringify(futureExpensesList));
+      await onSave(expensesToSave);
       setIsSaving(false);
-      // Don't reset the list here - let the parent component update through props
+      toast.success('Future expenses saved successfully to database');
     } catch (error) {
       console.error('Error saving future expenses:', error);
       setIsSaving(false);
-      toast.error('Failed to save future expenses');
+      toast.error('Failed to save future expenses to database');
     }
   };
 
@@ -215,7 +221,7 @@ const FutureExpensesForm = ({ futureExpenses, onSave }: FutureExpensesFormProps)
                   const uiExpense = mapDbToUiExpense(expense);
                   return (
                     <div 
-                      key={index} 
+                      key={expense.id || index} 
                       className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
                     >
                       <div>

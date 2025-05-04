@@ -44,8 +44,10 @@ const ExternalInvestmentsForm = ({ investments, onSave }: ExternalInvestmentsFor
 
   // Update the investments list when props change
   useEffect(() => {
-    console.log("ExternalInvestmentsForm received updated investments:", investments);
-    setInvestmentsList(investments || []);
+    if (investments && investments.length > 0) {
+      console.log("ExternalInvestmentsForm received updated investments:", investments);
+      setInvestmentsList(investments);
+    }
   }, [investments]);
 
   const handleAddInvestment = () => {
@@ -61,7 +63,10 @@ const ExternalInvestmentsForm = ({ investments, onSave }: ExternalInvestmentsFor
       id: newInvestment.id || Date.now() 
     };
     
-    setInvestmentsList([...investmentsList, investmentWithId]);
+    // Update local state with the new investment
+    const updatedList = [...investmentsList, investmentWithId];
+    setInvestmentsList(updatedList);
+    
     setNewInvestment({
       type: 'Fixed Deposit',
       name: '',
@@ -83,13 +88,15 @@ const ExternalInvestmentsForm = ({ investments, onSave }: ExternalInvestmentsFor
     try {
       setIsSaving(true);
       console.log("Saving investments:", investmentsList);
-      await onSave(investmentsList);
+      // Make a deep copy to avoid reference issues
+      const investmentsToSave = JSON.parse(JSON.stringify(investmentsList));
+      await onSave(investmentsToSave);
       setIsSaving(false);
-      // Don't reset the list here - let the parent component update through props
+      toast.success('Investments saved successfully to database');
     } catch (error) {
       console.error('Error saving investments:', error);
       setIsSaving(false);
-      toast.error('Failed to save investments');
+      toast.error('Failed to save investments to database');
     }
   };
 

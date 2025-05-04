@@ -183,7 +183,7 @@ const AnalysisService = {
       }
 
       // Fixed: Use the correct typing for the RPC function call
-      const { data, error } = await supabase.rpc<GetLatestAnalysisResponse>('get_latest_portfolio_analysis', {
+      const { data, error } = await supabase.rpc('get_latest_portfolio_analysis', {
         user_id_input: user.id
       });
 
@@ -197,7 +197,8 @@ const AnalysisService = {
       }
 
       // Handle the response structure correctly
-      return data.analysis_data as AnalysisReport;
+      const analysisData = data as GetLatestAnalysisResponse;
+      return analysisData.analysis_data || null;
     } catch (error) {
       console.error("Error in getLatestAnalysis:", error);
       return null;
@@ -213,7 +214,7 @@ const AnalysisService = {
       }
 
       // Fixed: Use the correct typing for the RPC function call
-      const { data, error } = await supabase.rpc<GetAllAnalysesResponse[]>('get_all_portfolio_analyses', {
+      const { data, error } = await supabase.rpc('get_all_portfolio_analyses', {
         user_id_input: user.id
       });
 
@@ -226,8 +227,10 @@ const AnalysisService = {
         return [];
       }
 
+      // Parse the response correctly
+      const analysesData = data as GetAllAnalysesResponse[];
       // Return the analyses with proper typing
-      return data.map(item => item.analysis_data);
+      return analysesData.map(item => item.analysis_data);
     } catch (error) {
       console.error("Error in getAllAnalyses:", error);
       return [];

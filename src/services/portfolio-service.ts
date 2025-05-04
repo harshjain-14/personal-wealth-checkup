@@ -1,4 +1,3 @@
-
 // Updated Portfolio service to use Supabase
 
 import { supabase } from "@/integrations/supabase/client";
@@ -276,7 +275,6 @@ const PortfolioService = {
     }
   },
 
-  // Save external investments
   saveExternalInvestments: async (investments: ExternalInvestment[]): Promise<ExternalInvestment[]> => {
     try {
       const user = (await supabase.auth.getUser()).data.user;
@@ -299,30 +297,35 @@ const PortfolioService = {
         throw deleteError;
       }
       
-      // Insert new investments
+      // Only insert if there are investments to save
       if (investments.length > 0) {
-        // Insert investments one by one to avoid type issues
-        for (const investment of investments) {
-          const { error: insertError } = await supabase
-            .from('external_investments')
-            .insert({
-              user_id: user.id,
-              investment_name: investment.name,
-              investment_type: investment.type,
-              amount: investment.amount,
-              notes: investment.notes || ''
-            });
-            
-          if (insertError) {
-            console.error('Error inserting investment:', insertError);
-            toast.error('Failed to save some investments');
-          }
+        // Create an array of investments to insert
+        const investmentsToInsert = investments.map(investment => ({
+          user_id: user.id,
+          investment_name: investment.name,
+          investment_type: investment.type,
+          amount: investment.amount,
+          notes: investment.notes || ''
+        }));
+        
+        // Insert all investments in a single request
+        const { error: insertError } = await supabase
+          .from('external_investments')
+          .insert(investmentsToInsert);
+          
+        if (insertError) {
+          console.error('Error inserting investments:', insertError);
+          toast.error('Failed to save investments');
+          throw insertError;
         }
       }
       
       console.log("Investments saved successfully");
       toast.success("Investments saved successfully");
-      return investments;
+      
+      // Fetch the updated investments to refresh the UI
+      const updatedInvestments = await PortfolioService.getExternalInvestments();
+      return updatedInvestments;
     } catch (error) {
       console.error('Error saving external investments:', error);
       toast.error('Failed to save external investments');
@@ -363,7 +366,6 @@ const PortfolioService = {
     }
   },
   
-  // Save regular expenses
   saveExpenses: async (expenses: Expense[]): Promise<Expense[]> => {
     try {
       const user = (await supabase.auth.getUser()).data.user;
@@ -386,31 +388,34 @@ const PortfolioService = {
         throw deleteError;
       }
       
-      // Insert new expenses one by one
+      // Only insert if there are expenses to save
       if (expenses.length > 0) {
-        for (const expense of expenses) {
-          const { error: insertError } = await supabase
-            .from('regular_expenses')
-            .insert({
-              user_id: user.id,
-              description: expense.name,
-              amount: expense.amount,
-              frequency: mapExpenseFrequencyForDb(expense.frequency),
-              expense_type: mapExpenseTypeForDb(expense.type),
-              notes: expense.notes || ''
-            });
-            
-          if (insertError) {
-            console.error('Error inserting expense:', insertError);
-            toast.error('Failed to save some expenses');
-          }
+        // Create an array of expenses to insert
+        const expensesToInsert = expenses.map(expense => ({
+          user_id: user.id,
+          description: expense.name,
+          amount: expense.amount,
+          frequency: mapExpenseFrequencyForDb(expense.frequency),
+          expense_type: mapExpenseTypeForDb(expense.type),
+          notes: expense.notes || ''
+        }));
+        
+        // Insert all expenses in a single request
+        const { error: insertError } = await supabase
+          .from('regular_expenses')
+          .insert(expensesToInsert);
+          
+        if (insertError) {
+          console.error('Error inserting expenses:', insertError);
+          toast.error('Failed to save expenses');
+          throw insertError;
         }
       }
       
       console.log("Expenses saved successfully");
       toast.success("Expenses saved successfully");
       
-      // Immediately fetch updated expenses to ensure UI consistency
+      // Fetch updated expenses to refresh the UI
       const updatedExpenses = await PortfolioService.getExpenses();
       return updatedExpenses;
     } catch (error) {
@@ -454,7 +459,6 @@ const PortfolioService = {
     }
   },
   
-  // Save future expenses
   saveFutureExpenses: async (expenses: FutureExpense[]): Promise<FutureExpense[]> => {
     try {
       const user = (await supabase.auth.getUser()).data.user;
@@ -477,31 +481,34 @@ const PortfolioService = {
         throw deleteError;
       }
       
-      // Insert new future expenses one by one
+      // Only insert if there are expenses to save
       if (expenses.length > 0) {
-        for (const expense of expenses) {
-          const { error: insertError } = await supabase
-            .from('future_expenses')
-            .insert({
-              user_id: user.id,
-              purpose: mapFuturePurposeForDb(expense.purpose),
-              amount: expense.amount,
-              timeframe: mapTimeFrameForDb(expense.timeframe),
-              priority: mapPriorityLevelForDb(expense.priority),
-              notes: expense.notes || ''
-            });
-            
-          if (insertError) {
-            console.error('Error inserting future expense:', insertError);
-            toast.error('Failed to save some future expenses');
-          }
+        // Create an array of future expenses to insert
+        const expensesToInsert = expenses.map(expense => ({
+          user_id: user.id,
+          purpose: mapFuturePurposeForDb(expense.purpose),
+          amount: expense.amount,
+          timeframe: mapTimeFrameForDb(expense.timeframe),
+          priority: mapPriorityLevelForDb(expense.priority),
+          notes: expense.notes || ''
+        }));
+        
+        // Insert all future expenses in a single request
+        const { error: insertError } = await supabase
+          .from('future_expenses')
+          .insert(expensesToInsert);
+          
+        if (insertError) {
+          console.error('Error inserting future expenses:', insertError);
+          toast.error('Failed to save future expenses');
+          throw insertError;
         }
       }
       
       console.log("Future expenses saved successfully");
       toast.success("Future expenses saved successfully");
       
-      // Immediately fetch updated future expenses to ensure UI consistency
+      // Fetch updated future expenses to refresh the UI
       const updatedFutureExpenses = await PortfolioService.getFutureExpenses();
       return updatedFutureExpenses;
     } catch (error) {
@@ -569,7 +576,7 @@ const PortfolioService = {
     }
   },
   
-  // Save user info
+  // Add fixed saveUserInfo function to ensure user info is saved correctly
   saveUserInfo: async (userInfo: UserInfo): Promise<UserInfo> => {
     try {
       const user = (await supabase.auth.getUser()).data.user;
