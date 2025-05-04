@@ -1,3 +1,4 @@
+
 // Updated Portfolio service to use Supabase
 
 import { supabase } from "@/integrations/supabase/client";
@@ -305,7 +306,7 @@ const PortfolioService = {
           investment_name: investment.name,
           investment_type: investment.type,
           amount: investment.amount,
-          notes: investment.notes || ''
+          notes: investment.notes || null
         }));
         
         // Insert all investments in a single request
@@ -358,7 +359,7 @@ const PortfolioService = {
         name: inv.investment_name,
         type: inv.investment_type as InvestmentType,
         amount: inv.amount,
-        notes: inv.notes
+        notes: inv.notes || undefined
       }));
     } catch (error) {
       console.error('Error fetching external investments:', error);
@@ -397,7 +398,7 @@ const PortfolioService = {
           amount: expense.amount,
           frequency: mapExpenseFrequencyForDb(expense.frequency),
           expense_type: mapExpenseTypeForDb(expense.type),
-          notes: expense.notes || ''
+          notes: expense.notes || null
         }));
         
         // Insert all expenses in a single request
@@ -451,7 +452,7 @@ const PortfolioService = {
         type: exp.expense_type as ExpenseType,
         amount: exp.amount,
         frequency: exp.frequency.toLowerCase() as ExpenseFrequency,
-        notes: exp.notes
+        notes: exp.notes || undefined
       }));
     } catch (error) {
       console.error('Error fetching regular expenses:', error);
@@ -490,7 +491,7 @@ const PortfolioService = {
           amount: expense.amount,
           timeframe: mapTimeFrameForDb(expense.timeframe),
           priority: mapPriorityLevelForDb(expense.priority),
-          notes: expense.notes || ''
+          notes: expense.notes || null
         }));
         
         // Insert all future expenses in a single request
@@ -567,7 +568,7 @@ const PortfolioService = {
           amount: exp.amount,
           timeframe,
           priority,
-          notes: exp.notes
+          notes: exp.notes || undefined
         };
       });
     } catch (error) {
@@ -601,6 +602,7 @@ const PortfolioService = {
       // Prepare data for database
       const dbCity = mapCityToDbEnum(userInfo.city);
       const dbRiskTolerance = mapRiskToleranceForDb(userInfo.riskTolerance);
+      const financialGoals = userInfo.financialGoals || [];
       
       if (existingData) {
         // Update existing user info
@@ -610,9 +612,9 @@ const PortfolioService = {
             age: userInfo.age,
             city: dbCity,
             risk_tolerance: dbRiskTolerance,
-            financial_goals: userInfo.financialGoals || []
+            financial_goals: financialGoals
           })
-          .eq('user_id', user.id);
+          .eq('id', existingData.id);
           
         if (updateError) {
           console.error('Error updating user info:', updateError);
@@ -630,7 +632,7 @@ const PortfolioService = {
             age: userInfo.age,
             city: dbCity,
             risk_tolerance: dbRiskTolerance,
-            financial_goals: userInfo.financialGoals || []
+            financial_goals: financialGoals
           });
           
         if (insertError) {
@@ -700,14 +702,16 @@ const PortfolioService = {
       }
       
       // Convert portfolioData to JSON type before insertion
-      const portfolioDataJson = JSON.parse(JSON.stringify(portfolioData)) as Json;
+      // Deep clone to avoid reference issues and ensure we're storing a clean copy
+      // that can be safely converted to and from JSON
+      const portfolioDataClone = JSON.parse(JSON.stringify(portfolioData));
       
       // Use direct insert with proper typing
       const { error } = await supabase
         .from('portfolio_snapshots')
         .insert({
           user_id: user.id,
-          snapshot_data: portfolioDataJson
+          snapshot_data: portfolioDataClone as Json
         });
       
       if (error) {

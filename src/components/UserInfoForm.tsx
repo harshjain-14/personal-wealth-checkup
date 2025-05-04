@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -97,20 +98,21 @@ const UserInfoForm = ({ userInfo, onSave }: UserInfoFormProps) => {
     riskTolerance: RiskDisplayType;
     financialGoals: string[];
   }>({
-    age: userInfo?.age || 0,
+    age: userInfo?.age || 30,
     city: userInfo?.city ? dbToCityMap[userInfo.city] : 'Mumbai',
     riskTolerance: userInfo?.riskTolerance ? dbToRiskMap[userInfo.riskTolerance] : 'medium',
     financialGoals: userInfo?.financialGoals || []
   });
   const [otherCity, setOtherCity] = useState('');
-  const [selectedGoals, setSelectedGoals] = useState<string[]>(formData.financialGoals || []);
+  const [selectedGoals, setSelectedGoals] = useState<string[]>(userInfo?.financialGoals || []);
   const [isSaving, setIsSaving] = useState(false);
   
+  // Update form data when userInfo changes
   useEffect(() => {
     if (userInfo) {
       console.log("UserInfoForm received updated user info:", userInfo);
       setFormData({
-        age: userInfo.age,
+        age: userInfo.age || 30,
         city: userInfo.city ? dbToCityMap[userInfo.city] : 'Mumbai',
         riskTolerance: userInfo.riskTolerance ? dbToRiskMap[userInfo.riskTolerance] : 'medium',
         financialGoals: userInfo.financialGoals || []
@@ -120,11 +122,12 @@ const UserInfoForm = ({ userInfo, onSave }: UserInfoFormProps) => {
   }, [userInfo]);
 
   const handleGoalToggle = (goal: string) => {
-    if (selectedGoals.includes(goal)) {
-      setSelectedGoals(selectedGoals.filter(g => g !== goal));
-    } else {
-      setSelectedGoals([...selectedGoals, goal]);
-    }
+    const updatedGoals = selectedGoals.includes(goal)
+      ? selectedGoals.filter(g => g !== goal)
+      : [...selectedGoals, goal];
+    
+    setSelectedGoals(updatedGoals);
+    setFormData(prev => ({ ...prev, financialGoals: updatedGoals }));
   };
 
   const handleSubmit = async () => {
@@ -152,6 +155,9 @@ const UserInfoForm = ({ userInfo, onSave }: UserInfoFormProps) => {
         riskTolerance: mappedRiskTolerance,
         financialGoals: selectedGoals
       });
+      
+      // The parent component should handle the success message
+      // and will update the userInfo prop which will trigger our useEffect
     } catch (error) {
       console.error("Error saving user info:", error);
       toast.error("Failed to save personal information");
