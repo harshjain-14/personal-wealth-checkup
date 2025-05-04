@@ -98,9 +98,9 @@ interface GetLatestAnalysisResponse {
 }
 
 interface GetAllAnalysesResponse {
-  id?: number;
-  analysis_data?: AnalysisReport;
-  generated_at?: string;
+  id: number;
+  analysis_data: AnalysisReport;
+  generated_at: string;
 }
 
 // Create a service for portfolio analysis
@@ -156,8 +156,8 @@ const AnalysisService = {
         return;
       }
 
-      // Use properly typed parameters for the RPC function
-      const { error } = await supabase.rpc('save_portfolio_analysis', {
+      // Fixed: Use properly typed parameters for the RPC function
+      const { error } = await supabase.rpc<SaveAnalysisResponse>('save_portfolio_analysis', {
         analysis_data: analysis,
         user_id_input: user.id,
         generated_at_input: analysis.generatedAt
@@ -182,8 +182,8 @@ const AnalysisService = {
         return null;
       }
 
-      // Use the correct typing for the RPC function call
-      const { data, error } = await supabase.rpc('get_latest_portfolio_analysis', {
+      // Fixed: Use the correct typing for the RPC function call
+      const { data, error } = await supabase.rpc<GetLatestAnalysisResponse>('get_latest_portfolio_analysis', {
         user_id_input: user.id
       });
 
@@ -212,8 +212,8 @@ const AnalysisService = {
         return [];
       }
 
-      // Use the correct typing for the RPC function call
-      const { data, error } = await supabase.rpc('get_all_portfolio_analyses', {
+      // Fixed: Use the correct typing for the RPC function call
+      const { data, error } = await supabase.rpc<GetAllAnalysesResponse[]>('get_all_portfolio_analyses', {
         user_id_input: user.id
       });
 
@@ -227,7 +227,7 @@ const AnalysisService = {
       }
 
       // Return the analyses with proper typing
-      return data.map(item => item.analysis_data as AnalysisReport);
+      return data.map(item => item.analysis_data);
     } catch (error) {
       console.error("Error in getAllAnalyses:", error);
       return [];

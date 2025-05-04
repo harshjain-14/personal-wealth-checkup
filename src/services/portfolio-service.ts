@@ -409,7 +409,10 @@ const PortfolioService = {
       
       console.log("Expenses saved successfully");
       toast.success("Expenses saved successfully");
-      return expenses;
+      
+      // Immediately fetch updated expenses to ensure UI consistency
+      const updatedExpenses = await PortfolioService.getExpenses();
+      return updatedExpenses;
     } catch (error) {
       console.error('Error saving regular expenses:', error);
       toast.error('Failed to save regular expenses');
@@ -497,7 +500,10 @@ const PortfolioService = {
       
       console.log("Future expenses saved successfully");
       toast.success("Future expenses saved successfully");
-      return expenses;
+      
+      // Immediately fetch updated future expenses to ensure UI consistency
+      const updatedFutureExpenses = await PortfolioService.getFutureExpenses();
+      return updatedFutureExpenses;
     } catch (error) {
       console.error('Error saving future expenses:', error);
       toast.error('Failed to save future expenses');
@@ -612,7 +618,7 @@ const PortfolioService = {
         const { error: insertError } = await supabase
           .from('personal_info')
           .insert({
-            id, // Generate a UUID for the id field
+            id,
             user_id: user.id,
             age: userInfo.age,
             city: dbCity,
@@ -629,7 +635,10 @@ const PortfolioService = {
       
       console.log("User info saved successfully");
       toast.success("Personal information saved successfully");
-      return userInfo;
+      
+      // Immediately fetch updated user info to ensure UI consistency
+      const updatedUserInfo = await PortfolioService.getUserInfo();
+      return updatedUserInfo || userInfo;
     } catch (error) {
       console.error('Error saving user info:', error);
       toast.error('Failed to save user information');

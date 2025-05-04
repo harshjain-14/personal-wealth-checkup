@@ -1,4 +1,6 @@
 
+// The FutureExpensesForm component is very long, so I'll focus on the most critical parts to fix
+
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -138,6 +140,7 @@ const FutureExpensesForm = ({ futureExpenses, onSave }: FutureExpensesFormProps)
 
   // Update the list when props change to ensure data consistency
   useEffect(() => {
+    console.log("FutureExpensesForm received updated expenses:", futureExpenses);
     setFutureExpensesList(futureExpenses || []);
   }, [futureExpenses]);
 
@@ -149,9 +152,15 @@ const FutureExpensesForm = ({ futureExpenses, onSave }: FutureExpensesFormProps)
 
     const dbExpense = mapUiToDbExpense(newExpense, customTimeframe);
     
-    console.log("Adding future expense:", dbExpense);
+    // Add ID for React keys
+    const expenseWithId = {
+      ...dbExpense, 
+      id: dbExpense.id || Date.now()
+    };
     
-    setFutureExpensesList([...futureExpensesList, dbExpense]);
+    console.log("Adding future expense:", expenseWithId);
+    
+    setFutureExpensesList([...futureExpensesList, expenseWithId]);
     
     setNewExpense({
       purpose: 'House Purchase',
@@ -178,10 +187,11 @@ const FutureExpensesForm = ({ futureExpenses, onSave }: FutureExpensesFormProps)
       console.log("Saving future expenses:", futureExpensesList);
       await onSave(futureExpensesList);
       setIsSaving(false);
-      // Success toast is handled in the portfolio service
+      // Don't reset the list here - let the parent component update through props
     } catch (error) {
       console.error('Error saving future expenses:', error);
       setIsSaving(false);
+      toast.error('Failed to save future expenses');
     }
   };
 

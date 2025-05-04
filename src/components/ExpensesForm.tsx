@@ -51,6 +51,7 @@ const ExpensesForm = ({ expenses, onSave }: ExpensesFormProps) => {
 
   // Update expenses list when props change
   useEffect(() => {
+    console.log("ExpensesForm received updated expenses:", expenses);
     setExpensesList(expenses || []);
   }, [expenses]);
 
@@ -60,7 +61,14 @@ const ExpensesForm = ({ expenses, onSave }: ExpensesFormProps) => {
       return;
     }
 
-    setExpensesList([...expensesList, { ...newExpense, amount: Number(newExpense.amount) }]);
+    // Add ID for React keys
+    const expenseWithId = {
+      ...newExpense,
+      amount: Number(newExpense.amount),
+      id: newExpense.id || Date.now()
+    };
+
+    setExpensesList([...expensesList, expenseWithId]);
     setNewExpense({
       type: 'EMI',
       name: '',
@@ -82,12 +90,14 @@ const ExpensesForm = ({ expenses, onSave }: ExpensesFormProps) => {
   const handleSave = async () => {
     try {
       setIsSaving(true);
+      console.log("Saving expenses:", expensesList);
       await onSave(expensesList);
       setIsSaving(false);
-      // Success toast is handled in the portfolio service
+      // Don't reset the list here - let the parent component update through props
     } catch (error) {
       console.error('Error saving expenses:', error);
       setIsSaving(false);
+      toast.error('Failed to save expenses');
     }
   };
 

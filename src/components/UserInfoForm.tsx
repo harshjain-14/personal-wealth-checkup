@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -105,9 +104,11 @@ const UserInfoForm = ({ userInfo, onSave }: UserInfoFormProps) => {
   });
   const [otherCity, setOtherCity] = useState('');
   const [selectedGoals, setSelectedGoals] = useState<string[]>(formData.financialGoals || []);
+  const [isSaving, setIsSaving] = useState(false);
   
   useEffect(() => {
     if (userInfo) {
+      console.log("UserInfoForm received updated user info:", userInfo);
       setFormData({
         age: userInfo.age,
         city: userInfo.city ? dbToCityMap[userInfo.city] : 'Mumbai',
@@ -126,7 +127,7 @@ const UserInfoForm = ({ userInfo, onSave }: UserInfoFormProps) => {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.age || formData.age <= 0 || formData.age > 100) {
       toast.error('Please enter a valid age');
       return;
@@ -137,17 +138,26 @@ const UserInfoForm = ({ userInfo, onSave }: UserInfoFormProps) => {
       return;
     }
 
+    setIsSaving(true);
+    
     const mappedCity = formData.city === 'Other' && otherCity ? 'overseas' : cityToDbMap[formData.city];
     const mappedRiskTolerance = riskToDbMap[formData.riskTolerance];
     
     console.log("DEBUG - Submitting user info with financial goals:", selectedGoals);
     
-    onSave({
-      age: formData.age,
-      city: mappedCity,
-      riskTolerance: mappedRiskTolerance,
-      financialGoals: selectedGoals
-    });
+    try {
+      await onSave({
+        age: formData.age,
+        city: mappedCity,
+        riskTolerance: mappedRiskTolerance,
+        financialGoals: selectedGoals
+      });
+    } catch (error) {
+      console.error("Error saving user info:", error);
+      toast.error("Failed to save personal information");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -251,8 +261,9 @@ const UserInfoForm = ({ userInfo, onSave }: UserInfoFormProps) => {
         <Button 
           onClick={handleSubmit}
           className="w-full bg-finance-blue hover:bg-finance-blue/90"
+          disabled={isSaving}
         >
-          Save Personal Information
+          {isSaving ? 'Saving...' : 'Save Personal Information'}
         </Button>
       </CardFooter>
     </Card>

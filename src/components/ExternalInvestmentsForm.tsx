@@ -44,6 +44,7 @@ const ExternalInvestmentsForm = ({ investments, onSave }: ExternalInvestmentsFor
 
   // Update the investments list when props change
   useEffect(() => {
+    console.log("ExternalInvestmentsForm received updated investments:", investments);
     setInvestmentsList(investments || []);
   }, [investments]);
 
@@ -84,7 +85,7 @@ const ExternalInvestmentsForm = ({ investments, onSave }: ExternalInvestmentsFor
       console.log("Saving investments:", investmentsList);
       await onSave(investmentsList);
       setIsSaving(false);
-      // Success toast is handled in the portfolio service
+      // Don't reset the list here - let the parent component update through props
     } catch (error) {
       console.error('Error saving investments:', error);
       setIsSaving(false);
