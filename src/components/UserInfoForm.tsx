@@ -13,11 +13,10 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { UserInfo, CityType, RiskTolerance } from '@/services/portfolio-service';
-import { Database } from '@/integrations/supabase/types';
 
 interface UserInfoFormProps {
   userInfo?: UserInfo;
-  onSave: (userInfo: UserInfo) => void;
+  onSave: (userInfo: UserInfo) => Promise<void>;
 }
 
 // City mapping for UI display
@@ -156,8 +155,7 @@ const UserInfoForm = ({ userInfo, onSave }: UserInfoFormProps) => {
         financialGoals: selectedGoals
       });
       
-      // The parent component should handle the success message
-      // and will update the userInfo prop which will trigger our useEffect
+      // Success message shown by the parent component
     } catch (error) {
       console.error("Error saving user info:", error);
       toast.error("Failed to save personal information");

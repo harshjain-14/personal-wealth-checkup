@@ -156,7 +156,7 @@ const AnalysisService = {
         return;
       }
 
-      // Fixed: Use properly typed parameters for the RPC function
+      // Fixed: Use object literal for RPC parameters
       const { error } = await supabase.rpc('save_portfolio_analysis', {
         analysis_data: analysis,
         user_id_input: user.id,

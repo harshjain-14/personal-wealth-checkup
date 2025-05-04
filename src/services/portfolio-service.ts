@@ -577,7 +577,7 @@ const PortfolioService = {
     }
   },
   
-  // Add fixed saveUserInfo function to ensure user info is saved correctly
+  // Fixed saveUserInfo function to ensure user info is saved correctly
   saveUserInfo: async (userInfo: UserInfo): Promise<UserInfo> => {
     try {
       const user = (await supabase.auth.getUser()).data.user;
@@ -599,12 +599,26 @@ const PortfolioService = {
         console.error('Error fetching existing user info:', fetchError);
       }
       
+      // Generate UUID for the personal_info row
+      const userId = user.id;
+      const id = userInfo.id || crypto.randomUUID();
+      
       // Prepare data for database
       const dbCity = mapCityToDbEnum(userInfo.city);
       const dbRiskTolerance = mapRiskToleranceForDb(userInfo.riskTolerance);
       const financialGoals = userInfo.financialGoals || [];
       
+      console.log('Prepared user info for DB:', {
+        id,
+        user_id: userId,
+        age: userInfo.age,
+        city: dbCity,
+        risk_tolerance: dbRiskTolerance,
+        financial_goals: financialGoals
+      });
+      
       if (existingData) {
+        console.log('Updating existing personal info with ID:', existingData.id);
         // Update existing user info
         const { error: updateError } = await supabase
           .from('personal_info')
@@ -614,7 +628,7 @@ const PortfolioService = {
             risk_tolerance: dbRiskTolerance,
             financial_goals: financialGoals
           })
-          .eq('id', existingData.id);
+          .eq('user_id', userId);
           
         if (updateError) {
           console.error('Error updating user info:', updateError);
@@ -622,13 +636,13 @@ const PortfolioService = {
           throw updateError;
         }
       } else {
-        // Insert new user info with a generated UUID
-        const id = crypto.randomUUID();
+        console.log('Creating new personal info with ID:', id);
+        // Insert new user info with the generated UUID
         const { error: insertError } = await supabase
           .from('personal_info')
           .insert({
             id,
-            user_id: user.id,
+            user_id: userId,
             age: userInfo.age,
             city: dbCity,
             risk_tolerance: dbRiskTolerance,
@@ -647,7 +661,7 @@ const PortfolioService = {
       
       // Immediately fetch updated user info to ensure UI consistency
       const updatedUserInfo = await PortfolioService.getUserInfo();
-      return updatedUserInfo || userInfo;
+      return updatedUserInfo || {...userInfo, id};
     } catch (error) {
       console.error('Error saving user info:', error);
       toast.error('Failed to save user information');
