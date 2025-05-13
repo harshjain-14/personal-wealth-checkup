@@ -4,17 +4,21 @@ CREATE OR REPLACE FUNCTION public.save_portfolio_analysis(
   analysis_data jsonb,
   user_id_input uuid,
   generated_at_input timestamp with time zone
-) RETURNS void AS $$
+) RETURNS boolean AS $$
 BEGIN
   INSERT INTO public.portfolio_analysis (
     user_id,
     analysis_data,
-    generated_at
+    analysis_date
   ) VALUES (
     user_id_input,
     analysis_data,
     generated_at_input
   );
+  RETURN TRUE;
+EXCEPTION
+  WHEN OTHERS THEN
+    RETURN FALSE;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -29,12 +33,12 @@ BEGIN
     jsonb_build_object(
       'id', id,
       'analysis_data', analysis_data,
-      'generated_at', generated_at
+      'generated_at', analysis_date
     )
   INTO result
   FROM public.portfolio_analysis
   WHERE user_id = user_id_input
-  ORDER BY generated_at DESC
+  ORDER BY analysis_date DESC
   LIMIT 1;
   
   RETURN result;
@@ -53,13 +57,13 @@ BEGIN
       jsonb_build_object(
         'id', id,
         'analysis_data', analysis_data,
-        'generated_at', generated_at
+        'generated_at', analysis_date
       )
     )
   INTO result
   FROM public.portfolio_analysis
   WHERE user_id = user_id_input
-  ORDER BY generated_at DESC;
+  ORDER BY analysis_date DESC;
   
   RETURN result;
 END;
@@ -73,7 +77,7 @@ BEGIN
       id BIGSERIAL PRIMARY KEY,
       user_id UUID REFERENCES auth.users NOT NULL,
       analysis_data JSONB NOT NULL,
-      generated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+      analysis_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
     );
   END IF;
 END

@@ -1,4 +1,3 @@
-
 // Updated Portfolio service to use Supabase
 
 import { supabase } from "@/integrations/supabase/client";
@@ -240,6 +239,7 @@ const PortfolioService = {
       const snapshotData = await PortfolioService.getLatestPortfolioSnapshot();
       
       if (snapshotData) {
+        console.log("Retrieved portfolio snapshot:", snapshotData);
         return snapshotData;
       }
 
@@ -251,7 +251,7 @@ const PortfolioService = {
         PortfolioService.getUserInfo()
       ]);
 
-      return {
+      const portfolioData = {
         stocks: [],
         mutualFunds: [],
         externalInvestments,
@@ -260,6 +260,9 @@ const PortfolioService = {
         userInfo: userInfo || undefined,
         lastUpdated: new Date().toISOString()
       };
+      
+      console.log("Built portfolio data from individual sources:", portfolioData);
+      return portfolioData;
     } catch (error) {
       console.error('Error fetching portfolio data:', error);
       toast.error('Failed to load portfolio data');
@@ -599,7 +602,7 @@ const PortfolioService = {
         console.error('Error fetching existing user info:', fetchError);
       }
       
-      // Generate UUID for the personal_info row
+      // Generate UUID for the personal_info row if needed
       const userId = user.id;
       const id = userInfo.id || crypto.randomUUID();
       
@@ -755,12 +758,19 @@ const PortfolioService = {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
       
-      if (error || !data) {
+      if (error) {
         console.error("Error fetching latest portfolio snapshot:", error);
         return null;
       }
+      
+      if (!data) {
+        console.log("No portfolio snapshot found");
+        return null;
+      }
+      
+      console.log("Retrieved portfolio snapshot:", data);
       
       // Return the snapshot data as PortfolioData
       return data.snapshot_data as unknown as PortfolioData;

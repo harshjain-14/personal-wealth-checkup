@@ -7,7 +7,6 @@ BEGIN
         CREATE TABLE IF NOT EXISTS public.portfolio_analysis (
           id BIGSERIAL PRIMARY KEY,
           user_id UUID NOT NULL REFERENCES auth.users(id),
-          portfolio_data JSONB NOT NULL,
           analysis_data JSONB NOT NULL,
           analysis_date TIMESTAMPTZ NOT NULL DEFAULT now(),
           created_at TIMESTAMPTZ NOT NULL DEFAULT now()

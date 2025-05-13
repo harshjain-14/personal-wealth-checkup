@@ -97,12 +97,6 @@ interface GetLatestAnalysisResponse {
   generated_at?: string;
 }
 
-interface GetAllAnalysesResponse {
-  id: number;
-  analysis_data: AnalysisReport;
-  generated_at: string;
-}
-
 // Create a service for portfolio analysis
 const AnalysisService = {
   generateAnalysis: async (portfolioData: PortfolioData): Promise<AnalysisReport> => {
@@ -156,8 +150,8 @@ const AnalysisService = {
         return;
       }
 
-      // Fixed: Use object literal for RPC parameters
-      const { error } = await supabase.rpc('save_portfolio_analysis', {
+      // Use proper typing for the parameters
+      const { error } = await supabase.rpc<{ success: boolean }>('save_portfolio_analysis', {
         analysis_data: analysis,
         user_id_input: user.id,
         generated_at_input: analysis.generatedAt
@@ -182,7 +176,7 @@ const AnalysisService = {
         return null;
       }
 
-      // Fixed: Use the correct typing for the RPC function call
+      // Use the correct typing for the RPC function call
       const { data, error } = await supabase.rpc<GetLatestAnalysisResponse>('get_latest_portfolio_analysis', {
         user_id_input: user.id
       });
@@ -212,8 +206,8 @@ const AnalysisService = {
         return [];
       }
 
-      // Fixed: Use the correct typing for the RPC function call
-      const { data, error } = await supabase.rpc<GetAllAnalysesResponse[]>('get_all_portfolio_analyses', {
+      // Use the correct typing for the RPC function call
+      const { data, error } = await supabase.rpc<any[]>('get_all_portfolio_analyses', {
         user_id_input: user.id
       });
 

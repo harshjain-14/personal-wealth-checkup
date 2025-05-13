@@ -96,15 +96,18 @@ const UserInfoForm = ({ userInfo, onSave }: UserInfoFormProps) => {
     city: CityDisplayType;
     riskTolerance: RiskDisplayType;
     financialGoals: string[];
+    id?: string;
   }>({
     age: userInfo?.age || 30,
     city: userInfo?.city ? dbToCityMap[userInfo.city] : 'Mumbai',
     riskTolerance: userInfo?.riskTolerance ? dbToRiskMap[userInfo.riskTolerance] : 'medium',
-    financialGoals: userInfo?.financialGoals || []
+    financialGoals: userInfo?.financialGoals || [],
+    id: userInfo?.id
   });
   const [otherCity, setOtherCity] = useState('');
   const [selectedGoals, setSelectedGoals] = useState<string[]>(userInfo?.financialGoals || []);
   const [isSaving, setIsSaving] = useState(false);
+  const [hasError, setHasError] = useState(false);
   
   // Update form data when userInfo changes
   useEffect(() => {
@@ -114,9 +117,11 @@ const UserInfoForm = ({ userInfo, onSave }: UserInfoFormProps) => {
         age: userInfo.age || 30,
         city: userInfo.city ? dbToCityMap[userInfo.city] : 'Mumbai',
         riskTolerance: userInfo.riskTolerance ? dbToRiskMap[userInfo.riskTolerance] : 'medium',
-        financialGoals: userInfo.financialGoals || []
+        financialGoals: userInfo.financialGoals || [],
+        id: userInfo.id
       });
       setSelectedGoals(userInfo.financialGoals || []);
+      setHasError(false);
     }
   }, [userInfo]);
 
@@ -132,23 +137,28 @@ const UserInfoForm = ({ userInfo, onSave }: UserInfoFormProps) => {
   const handleSubmit = async () => {
     if (!formData.age || formData.age <= 0 || formData.age > 100) {
       toast.error('Please enter a valid age');
+      setHasError(true);
       return;
     }
 
     if (!formData.city) {
       toast.error('Please select your city');
+      setHasError(true);
       return;
     }
 
     setIsSaving(true);
+    setHasError(false);
     
     const mappedCity = formData.city === 'Other' && otherCity ? 'overseas' : cityToDbMap[formData.city];
     const mappedRiskTolerance = riskToDbMap[formData.riskTolerance];
     
+    console.log("DEBUG - Submitting user info with id:", formData.id);
     console.log("DEBUG - Submitting user info with financial goals:", selectedGoals);
     
     try {
       await onSave({
+        id: formData.id,
         age: formData.age,
         city: mappedCity,
         riskTolerance: mappedRiskTolerance,
@@ -158,6 +168,7 @@ const UserInfoForm = ({ userInfo, onSave }: UserInfoFormProps) => {
       // Success message shown by the parent component
     } catch (error) {
       console.error("Error saving user info:", error);
+      setHasError(true);
       toast.error("Failed to save personal information");
     } finally {
       setIsSaving(false);
@@ -165,7 +176,7 @@ const UserInfoForm = ({ userInfo, onSave }: UserInfoFormProps) => {
   };
 
   return (
-    <Card className="w-full bg-white shadow-sm border-finance-teal/20">
+    <Card className={`w-full bg-white shadow-sm ${hasError ? 'border-red-300' : 'border-finance-teal/20'}`}>
       <CardHeader>
         <CardTitle className="text-lg font-medium">Personal Information</CardTitle>
         <CardDescription>
